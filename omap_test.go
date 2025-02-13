@@ -5,7 +5,13 @@ import "testing"
 func TestOmap(t *testing.T) {
 	t.Log("test")
 
+	// Enable print move
+	printMove = true
+
 	m := New[int, int](CompareRecordByKey[int, int])
+
+	t.Log("\nset records:")
+
 	m.Set(1, 2)
 	m.Set(2, 3)
 	m.Set(3, 4)
@@ -27,6 +33,8 @@ func TestOmap(t *testing.T) {
 	m.Set(19, 20)
 	m.Set(20, 21)
 
+	t.Log("\nlist records get with Get function:")
+
 	// Print all records
 	for i := 1; i <= 20; i++ {
 		d, ok := m.Get(int(i))
@@ -37,70 +45,83 @@ func TestOmap(t *testing.T) {
 
 	// Get first record from ordered map
 	rec := m.First()
-	key, d, err := RecordValue[int, int](rec)
-	t.Log("first key:", key, "data:", d, "err:", err)
+	if rec == nil {
+		t.Fatal("first record is nil")
+	}
+	t.Log("first key:", rec.Key(), "data:", rec.Data())
 
 	// Get next record from ordered map
 	rec = m.Next(rec)
-	key, d, err = RecordValue[int, int](rec)
-	t.Log("next key :", key, "data:", d, "err:", err)
+	if rec == nil {
+		t.Fatal("next record is nil")
+	}
+	t.Log("next key :", rec.Key(), "data:", rec.Data())
 
 	// Get previous record from ordered map
 	rec = m.Prev(rec)
-	key, d, err = RecordValue[int, int](rec)
-	t.Log("prev key :", key, "data:", d, "err:", err)
+	if rec == nil {
+		t.Fatal("prev record is nil")
+	}
+	t.Log("prev key :", rec.Key(), "data:", rec.Data())
 
 	// Get last record from ordered map
 	rec = m.Last()
-	key, d, err = RecordValue[int, int](rec)
-	t.Log("last key :", key, "data:", d, "err:", err)
+	if rec == nil {
+		t.Fatal("last record is nil")
+	}
+	t.Log("last key :", rec.Key(), "data:", rec.Data())
 
 	// Move last record to the front of ordered map
-	m.MoveToFront(rec)
+	err := m.MoveToFront(rec)
 	first := m.First()
-	key, d, err = RecordValue[int, int](first)
-	t.Log("first key:", key, "data:", d, "err:", err)
+	if first == nil {
+		t.Fatal("first record is nil")
+	}
+	t.Log("first key:", first.Key(), "data:", first.Data(), "err:", err)
 
 	// Get next record from ordered map
 	rec = m.Next(first)
-	key, d, err = RecordValue[int, int](rec)
-	t.Log("next key :", key, "data:", d, "err:", err)
+	if rec == nil {
+		t.Fatal("next record is nil")
+	}
+	t.Log("next key :", rec.Key(), "data:", rec.Data(), "err:")
 
 	// Move berfore
-	m.MoveBefore(rec, first)
+	err = m.MoveBefore(rec, first)
 	first = m.First()
-	key, d, err = RecordValue[int, int](first)
-	t.Log("first key:", key, "data:", d, "err:", err)
+	if first == nil {
+		t.Fatal("first record is nil")
+	}
+	t.Log("first key:", first.Key(), "data:", first.Data(), "err:", err)
 
 	t.Log()
 
+	t.Log("\nlist after move records:")
+
 	// Print all records
 	for rec := m.First(); rec != nil; rec = m.Next(rec) {
-		key, d, err := RecordValue[int, int](rec)
-		t.Log(key, d, err)
+		t.Log(rec.Key(), rec.Data())
 	}
 
+	t.Log("\nlist sorted by function:")
+
 	// Sort records using sort function
-	m.sortFunc(0, func(rec1, rec2 Record) int {
-		v1, _, _ := RecordValue[int, int](rec1)
-		v2, _, _ := RecordValue[int, int](rec2)
-		return v2 - v1
+	m.sortFunc(0, func(rec1, rec2 *Record[int, int]) int {
+		return rec1.Key() - rec2.Key()
 	})
 
 	// Print all records by default(insertion) order
 	for rec := m.First(); rec != nil; rec = m.Next(rec) {
-		key, d, err := RecordValue[int, int](rec)
-		t.Log(key, d, err)
+		t.Log(rec.Key(), rec.Data())
 	}
 
-	t.Log("\nlist by keys:")
+	t.Log("\nlist sorted by keys index:")
 
 	// Sort records using sort function
 	// m.SortFunc(0, CompareRecordByKey[int, int])
 
 	// Print all records by key order
 	for rec := m.First(1); rec != nil; rec = m.Next(rec) {
-		key, d, err := RecordValue[int, int](rec)
-		t.Log(key, d, err)
+		t.Log(rec.Key(), rec.Data())
 	}
 }

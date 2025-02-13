@@ -24,10 +24,12 @@ var (
 	ErrKeyAllreadySet = errors.New("key allready exists")
 )
 
-type Omap[K constraints.Ordered /* comparable */, D any] struct {
+var printMove = false
+
+type Omap[K comparable, D any] struct {
 
 	// Map by key
-	m Map[K]
+	m Map[K, D]
 
 	// List of map elements in order of insert and sort.
 	// There is to default sort list:
@@ -36,26 +38,19 @@ type Omap[K constraints.Ordered /* comparable */, D any] struct {
 	l []*list.List
 
 	// Sort functions
-	s []func(rec Record, next Record) int
+	s []func(rec, next *Record[K, D]) int
 
 	// Mutex to protect ordered map operations
 	*sync.RWMutex
 }
-type Map[K comparable] map[K]Record
-type Record *list.Element
-
-// recordValue is a struct that contains key and value of map and list element.
-type recordValue[K comparable, D any] struct {
-	Key  K
-	Data D
-}
+type Map[K comparable, D any] map[K]*Record[K, D]
 
 // New creates a new ordered map object with key of type T.
-func New[K constraints.Ordered /* comparable */, D any](sorts ...func(rec Record, next Record) int) *Omap[K, D] {
+func New[K comparable, D any](sorts ...func(rec, next *Record[K, D]) int) *Omap[K, D] {
 	o := new(Omap[K, D])
 
 	o.RWMutex = new(sync.RWMutex)
-	o.m = make(Map[K])
+	o.m = make(Map[K, D])
 
 	o.s = append(o.s, nil)
 	o.l = append(o.l, list.New())
@@ -68,43 +63,19 @@ func New[K constraints.Ordered /* comparable */, D any](sorts ...func(rec Record
 	return o
 }
 
-// RecordValue gets record value from element. It returns ErrRecordNotFound if
-// input record is nil.
-func RecordValue[K constraints.Ordered /* comparable */, D any](rec Record) (key K, data D, err error) {
-
-	// Return error if input record is nil
-	if rec == nil {
-		err = ErrRecordNotFound
-		return
-	}
-
-	// Get record value
-	if v, ok := rec.Value.(recordValue[K, D]); ok {
-		key = v.Key
-		data = v.Data
-	} else {
-		err = fmt.Errorf("not recordValue %T", rec.Value)
-	}
-	return
-}
-
-func CompareRecordByKey[K constraints.Ordered /* comparable */, D any](rec1, rec2 Record) int {
-	// v1, _, _ := RecordValue[K, D](rec1)
-	// v2, _, _ := RecordValue[K, D](rec2)
-
-	// fmt.Println("!!!")
-
-	r, _ := rec1.Value.(recordValue[K, D])
-	v1, _ := r.Key, r.Data
-
-	r, _ = rec2.Value.(recordValue[K, D])
-	v2, _ := r.Key, r.Data
+// CompareRecordByKey compares two records by their keys.
+// The function returns a negative value if rec1 key is less than rec2 key,
+// zero if the keys are equal, and a positive value if rec1 key is greater
+// than rec2 key.
+func CompareRecordByKey[K constraints.Ordered, D any](rec1, rec2 *Record[K, D]) int {
+	key1 := rec1.Key()
+	key2 := rec2.Key()
 
 	switch {
-	case v1 > v2:
+	case key1 > key2:
 		return 1
 
-	case v1 < v2:
+	case key1 < key2:
 		return -1
 
 	default:
@@ -117,7 +88,7 @@ func (o *Omap[K, D]) Clear() {
 	o.Lock()
 	defer o.Unlock()
 
-	o.m = make(Map[K])
+	o.m = make(Map[K, D])
 	for i := range o.l {
 		o.l[i].Init()
 	}
@@ -195,15 +166,15 @@ func (o *Omap[K, D]) Del(key K) (data D, ok bool) {
 	defer o.Unlock()
 
 	// Check if key exists and get data if exists
-	el, ok := o.m[key]
+	rec, ok := o.m[key]
 	if !ok {
 		return
 	}
-	data = el.Value.(D)
+	data = rec.Data()
 
 	// Remove element from lists
 	for i := range o.l {
-		o.l[i].Remove(el)
+		o.l[i].Remove(rec.element())
 	}
 
 	// Remove key from map
@@ -213,7 +184,7 @@ func (o *Omap[K, D]) Del(key K) (data D, ok bool) {
 }
 
 // First gets first record from ordered map or nil if map is empty.
-func (o *Omap[K, D]) First(idxs ...int) Record {
+func (o *Omap[K, D]) First(idxs ...int) *Record[K, D] {
 	o.RLock()
 	defer o.RUnlock()
 
@@ -226,12 +197,12 @@ func (o *Omap[K, D]) First(idxs ...int) Record {
 		return nil
 	}
 
-	return o.l[idx].Front()
+	return o.elementToRecord(o.l[idx].Front())
 }
 
 // Next gets next record from ordered map or nil if there is last record or input
 // record is nil.
-func (o *Omap[K, D]) Next(rec Record) Record {
+func (o *Omap[K, D]) Next(rec *Record[K, D]) *Record[K, D] {
 	o.RLock()
 	defer o.RUnlock()
 
@@ -240,19 +211,19 @@ func (o *Omap[K, D]) Next(rec Record) Record {
 		return nil
 	}
 
-	return (*list.Element)(rec).Next()
+	return o.elementToRecord(rec.element().Next())
 }
 
 // Prev gets previous record from ordered map or nil if this record is first.
-func (o *Omap[K, D]) Prev(rec Record) Record {
+func (o *Omap[K, D]) Prev(rec *Record[K, D]) *Record[K, D] {
 	o.RLock()
 	defer o.RUnlock()
 
-	return (*list.Element)(rec).Prev()
+	return o.elementToRecord(rec.element().Prev())
 }
 
 // Last gets last record from ordered map.
-func (o *Omap[K, D]) Last(idxs ...int) Record {
+func (o *Omap[K, D]) Last(idxs ...int) *Record[K, D] {
 	o.RLock()
 	defer o.RUnlock()
 
@@ -265,12 +236,14 @@ func (o *Omap[K, D]) Last(idxs ...int) Record {
 		return nil
 	}
 
-	return o.l[idx].Back()
+	return o.elementToRecord(o.l[idx].Back())
 }
 
 // InsertBefore inserts record before element. Returns ErrKeyAllreadySet if key
 // allready exists.
-func (o *Omap[K, D]) InsertBefore(idx int, key K, data D, rec Record) (err error) {
+func (o *Omap[K, D]) InsertBefore(idx int, key K, data D, mark *Record[K, D]) (
+	err error) {
+
 	o.Lock()
 	defer o.Unlock()
 
@@ -281,14 +254,14 @@ func (o *Omap[K, D]) InsertBefore(idx int, key K, data D, rec Record) (err error
 	}
 
 	// Add new record before selected
-	o.m[key] = o.insertRecord(key, data, 2, rec)
+	o.m[key] = o.insertRecord(key, data, 2, mark)
 
 	return
 }
 
 // InsertAfter inserts record after element. Returns ErrKeyAllreadySet if key
 // allready exists.
-func (o *Omap[K, D]) InsertAfter(key K, data D, rec Record) (err error) {
+func (o *Omap[K, D]) InsertAfter(key K, data D, mark *Record[K, D]) (err error) {
 	o.Lock()
 	defer o.Unlock()
 
@@ -298,16 +271,15 @@ func (o *Omap[K, D]) InsertAfter(key K, data D, rec Record) (err error) {
 		return
 	}
 
-	// o.m[key] = o.l.InsertAfter(recordValue[K, D]{Key: key, Data: data}, rec)
 	// Add new record before selected
-	o.m[key] = o.insertRecord(key, data, 3, rec)
+	o.m[key] = o.insertRecord(key, data, 3, mark)
 
 	return
 }
 
 // MoveToBack moves record to the back of ordered map. It returns ErrRecordNotFound
 // if input record is nil.
-func (o *Omap[K, D]) MoveToBack(rec Record) (err error) {
+func (o *Omap[K, D]) MoveToBack(rec *Record[K, D]) (err error) {
 	o.Lock()
 	defer o.Unlock()
 
@@ -318,14 +290,14 @@ func (o *Omap[K, D]) MoveToBack(rec Record) (err error) {
 	}
 
 	// Move record
-	o.l[0].MoveToBack(rec)
+	o.l[0].MoveToBack(rec.element())
 
 	return
 }
 
 // MoveToFront moves record to the front of ordered map. It returns ErrRecordNotFound
 // if input record is nil.
-func (o *Omap[K, D]) MoveToFront(rec Record) (err error) {
+func (o *Omap[K, D]) MoveToFront(rec *Record[K, D]) (err error) {
 	o.Lock()
 	defer o.Unlock()
 
@@ -336,13 +308,13 @@ func (o *Omap[K, D]) MoveToFront(rec Record) (err error) {
 	}
 
 	// Move record
-	o.l[0].MoveToFront(rec)
+	o.l[0].MoveToFront(rec.element())
 	return
 }
 
 // MoveBefore moves record rec to the new position before mark record. It returns
 // ErrRecordNotFound if input record or mark record is nil.
-func (o *Omap[K, D]) MoveBefore(rec, mark Record) (err error) {
+func (o *Omap[K, D]) MoveBefore(rec, mark *Record[K, D]) (err error) {
 	o.Lock()
 	defer o.Unlock()
 
@@ -353,14 +325,14 @@ func (o *Omap[K, D]) MoveBefore(rec, mark Record) (err error) {
 	}
 
 	// Move record
-	o.l[0].MoveBefore(rec, mark)
+	o.l[0].MoveBefore(rec.element(), mark.element())
 
 	return
 }
 
 // MoveAfter moves record rec to the new position after mark record. It returns
 // ErrRecordNotFound if input record or mark record is nil.
-func (o *Omap[K, D]) MoveAfter(rec, mark Record) (err error) {
+func (o *Omap[K, D]) MoveAfter(rec, mark *Record[K, D]) (err error) {
 	o.Lock()
 	defer o.Unlock()
 
@@ -371,21 +343,20 @@ func (o *Omap[K, D]) MoveAfter(rec, mark Record) (err error) {
 	}
 
 	// Move record
-	o.l[0].MoveAfter(rec, mark)
+	o.l[0].MoveAfter(rec.element(), mark.element())
 
 	return
 }
 
-// sortFunc sorts records using sort function.
-func (o *Omap[K, D]) sortFunc(idx int, f func(rec Record, next Record) int) {
-	// o.Lock()
-	// defer o.Unlock()
+// sortFunc sorts records using sort function. Unsafe (does not lock).
+func (o *Omap[K, D]) sortFunc(idx int, f func(rec, next *Record[K, D]) int) {
 
 	// Skip if f function not set
 	if f == nil {
 		return
 	}
 
+	// Sort records
 	var next *list.Element
 	for el := o.l[idx].Front(); el != nil; el = next {
 		next = el.Next()
@@ -394,8 +365,8 @@ func (o *Omap[K, D]) sortFunc(idx int, f func(rec Record, next Record) int) {
 }
 
 // sortRecord sorts record using sort function.
-func (o *Omap[K, D]) sortRecord(idx int, elToMove *list.Element, f func(rec Record,
-	next Record) int) {
+func (o *Omap[K, D]) sortRecord(idx int, elToMove *list.Element, f func(rec,
+	next *Record[K, D]) int) {
 
 	// Compare el record with next records using function f and move el if
 	// neccessary
@@ -408,13 +379,13 @@ func (o *Omap[K, D]) sortRecord(idx int, elToMove *list.Element, f func(rec Reco
 			// If move is set, than move elToMove record
 			if move {
 				o.l[idx].MoveAfter(elToMove, el)
-				o.printMove(false, elToMove, el)
+				o.printMove(idx, false, elToMove, el)
 			}
 			break
 		}
 
 		// Compare elToMove record with elNext record
-		if f(elToMove, elNext) > 0 {
+		if f(o.elementToRecord(elToMove), o.elementToRecord(elNext)) > 0 {
 			move = true
 			continue
 		}
@@ -422,7 +393,7 @@ func (o *Omap[K, D]) sortRecord(idx int, elToMove *list.Element, f func(rec Reco
 		// If move is set, than move elToMove record
 		if move {
 			o.l[idx].MoveBefore(elToMove, elNext)
-			o.printMove(true, elToMove, elNext)
+			o.printMove(idx, true, elToMove, elNext)
 		}
 
 		break
@@ -436,20 +407,22 @@ func (o *Omap[K, D]) sortRecord(idx int, elToMove *list.Element, f func(rec Reco
 //	1 - front,
 //	2 - insertRecord before
 //	3 - insertRecord after
-func (o *Omap[K, D]) insertRecord(key K, data D, direction int, mark Record) (el *list.Element) {
+func (o *Omap[K, D]) insertRecord(key K, data D, direction int,
+	mark *Record[K, D]) (rec *Record[K, D]) {
+
 	// Create new record and it to basic(insertion) list
-	rec := recordValue[K, D]{Key: key, Data: data}
+	v := recordValue[K, D]{Key: key, Data: data}
 
 	// Add element to basic(insertion) list
 	switch direction {
 	case 0:
-		el = o.l[0].PushBack(rec)
+		rec = o.elementToRecord(o.l[0].PushBack(v))
 	case 1:
-		el = o.l[0].PushFront(rec)
+		rec = o.elementToRecord(o.l[0].PushFront(v))
 	case 2:
-		el = o.l[0].InsertBefore(rec, mark)
+		rec = o.elementToRecord(o.l[0].InsertBefore(v, mark.element()))
 	case 3:
-		el = o.l[0].InsertAfter(rec, mark)
+		rec = o.elementToRecord(o.l[0].InsertAfter(v, mark.element()))
 	}
 
 	// Add element to back of additional lists and sort this lists
@@ -457,20 +430,26 @@ func (o *Omap[K, D]) insertRecord(key K, data D, direction int, mark Record) (el
 		if i == 0 {
 			continue
 		}
-		o.l[i].PushFront(rec)
+		o.l[i].PushBack(v)
 		o.sortFunc(i, o.s[i])
 	}
 
 	return
 }
 
-// Print move records
-func (o *Omap[K, D]) printMove(before bool, elmove, next *list.Element) {
-	key, _, _ := RecordValue[int, int](elmove)
-	keyNext, _, _ := RecordValue[int, int](next)
+// Print move records. To enable print move set printMove variable to true.
+func (o *Omap[K, D]) printMove(idx int, before bool, el, next *list.Element) {
+
+	if !printMove {
+		return
+	}
+
+	key := o.elementToRecord(el).Key()
+	keyNext := o.elementToRecord(next).Key()
+
 	if before {
-		fmt.Printf("MoveBefore: %v => %v\n", key, keyNext)
+		fmt.Printf("idx: %v, MoveBefore: %v => %v\n", idx, key, keyNext)
 	} else {
-		fmt.Printf("MoveAfter: %v => %v\n", key, keyNext)
+		fmt.Printf("idx: %v, MoveAfter: %v => %v\n", idx, key, keyNext)
 	}
 }
