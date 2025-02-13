@@ -127,15 +127,15 @@ func (o *Omap[K, D]) Set(key K, data D) (err error) {
 	o.Lock()
 	defer o.Unlock()
 
-	// Check if key allready exists and update data if exists
+	// Check if key allready exists and update data and sort lists if exists
 	if el, ok := o.m[key]; ok {
 		el.Value = data
-		// TODO: sort additional lists
+		o.sortLists()
 		return
 	}
 
 	// Add new record to back of lists and map
-	o.m[key] = o.insertRecord(key, data, 0, nil)
+	o.m[key] = o.insertRecord(key, data, back, nil)
 
 	return
 }
@@ -146,15 +146,15 @@ func (o *Omap[K, D]) SetFirst(key K, data D) (err error) {
 	o.Lock()
 	defer o.Unlock()
 
-	// Check if key allready exists and update data if exists
-	el, ok := o.m[key]
-	if ok {
+	// Check if key allready exists and update data and sort lists if exists
+	if el, ok := o.m[key]; ok {
 		el.Value = data
+		o.sortLists()
 		return
 	}
 
 	// Add new record to front of lists and map
-	o.m[key] = o.insertRecord(key, data, 1, nil)
+	o.m[key] = o.insertRecord(key, data, front, nil)
 
 	return
 }
@@ -254,7 +254,7 @@ func (o *Omap[K, D]) InsertBefore(idx int, key K, data D, mark *Record[K, D]) (
 	}
 
 	// Add new record before selected
-	o.m[key] = o.insertRecord(key, data, 2, mark)
+	o.m[key] = o.insertRecord(key, data, before, mark)
 
 	return
 }
@@ -272,7 +272,7 @@ func (o *Omap[K, D]) InsertAfter(key K, data D, mark *Record[K, D]) (err error) 
 	}
 
 	// Add new record before selected
-	o.m[key] = o.insertRecord(key, data, 3, mark)
+	o.m[key] = o.insertRecord(key, data, after, mark)
 
 	return
 }
@@ -400,6 +400,14 @@ func (o *Omap[K, D]) sortRecord(idx int, elToMove *list.Element, f func(rec,
 	}
 }
 
+// Directions const values
+const (
+	back int = iota
+	front
+	before
+	after
+)
+
 // insertRecord adds new record to ordered map.
 //
 //	direction:
@@ -435,6 +443,18 @@ func (o *Omap[K, D]) insertRecord(key K, data D, direction int,
 	}
 
 	return
+}
+
+// sortLists sorts all additional lists.
+func (o *Omap[K, D]) sortLists() {
+	for i := range o.s {
+		// Skip basic insertion list
+		if i == 0 {
+			continue
+		}
+		// Sort additional list
+		o.sortFunc(i, o.s[i])
+	}
 }
 
 // Print move records. To enable print move set printMove variable to true.
