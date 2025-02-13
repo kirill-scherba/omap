@@ -144,6 +144,16 @@ func (o *Omap[K, D]) Get(key K) (data D, ok bool) {
 	return
 }
 
+// GetRecord gets record from ordered map by key. Returns ok true if found.
+func (o *Omap[K, D]) GetRecord(key K) (rec *Record[K, D], ok bool) {
+	o.RLock()
+	defer o.RUnlock()
+
+	// Get record
+	rec, ok = o.m[key]
+	return
+}
+
 // Set adds or updates record in ordered map by key. It adds new record to the
 // back of ordered map. If key allready exists, it will be updated.
 func (o *Omap[K, D]) Set(key K, data D) (err error) {
