@@ -37,59 +37,59 @@ func TestOmap(t *testing.T) {
 
 	// Get first record from ordered map
 	rec := m.First()
-	key, d, err := m.RecordValue(rec)
+	key, d, err := RecordValue[int, int](rec)
 	t.Log("first key:", key, "data:", d, "err:", err)
 
 	// Get next record from ordered map
 	rec = m.Next(rec)
-	key, d, err = m.RecordValue(rec)
+	key, d, err = RecordValue[int, int](rec)
 	t.Log("next key :", key, "data:", d, "err:", err)
 
 	// Get previous record from ordered map
 	rec = m.Prev(rec)
-	key, d, err = m.RecordValue(rec)
+	key, d, err = RecordValue[int, int](rec)
 	t.Log("prev key :", key, "data:", d, "err:", err)
 
 	// Get last record from ordered map
 	rec = m.Last()
-	key, d, err = m.RecordValue(rec)
+	key, d, err = RecordValue[int, int](rec)
 	t.Log("last key :", key, "data:", d, "err:", err)
 
 	// Move last record to the front of ordered map
 	m.MoveToFront(rec)
 	first := m.First()
-	key, d, err = m.RecordValue(first)
+	key, d, err = RecordValue[int, int](first)
 	t.Log("first key:", key, "data:", d, "err:", err)
 
 	// Get next record from ordered map
 	rec = m.Next(first)
-	key, d, err = m.RecordValue(rec)
+	key, d, err = RecordValue[int, int](rec)
 	t.Log("next key :", key, "data:", d, "err:", err)
 
 	// Move berfore
 	m.MoveBefore(rec, first)
 	first = m.First()
-	key, d, err = m.RecordValue(first)
+	key, d, err = RecordValue[int, int](first)
 	t.Log("first key:", key, "data:", d, "err:", err)
 
 	t.Log()
 
 	// Print all records
 	for rec := m.First(); rec != nil; rec = m.Next(rec) {
-		key, d, err := m.RecordValue(rec)
+		key, d, err := RecordValue[int, int](rec)
 		t.Log(key, d, err)
 	}
 
 	// Sort records using sort function
 	m.sortFunc(0, func(rec1, rec2 Record) int {
-		v1, _, _ := m.RecordValue(rec1)
-		v2, _, _ := m.RecordValue(rec2)
+		v1, _, _ := RecordValue[int, int](rec1)
+		v2, _, _ := RecordValue[int, int](rec2)
 		return v2 - v1
 	})
 
 	// Print all records by default(insertion) order
 	for rec := m.First(); rec != nil; rec = m.Next(rec) {
-		key, d, err := m.RecordValue(rec)
+		key, d, err := RecordValue[int, int](rec)
 		t.Log(key, d, err)
 	}
 
@@ -100,7 +100,7 @@ func TestOmap(t *testing.T) {
 
 	// Print all records by key order
 	for rec := m.First(1); rec != nil; rec = m.Next(rec) {
-		key, d, err := m.RecordValue(rec)
+		key, d, err := RecordValue[int, int](rec)
 		t.Log(key, d, err)
 	}
 }

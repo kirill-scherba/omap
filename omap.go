@@ -70,7 +70,7 @@ func New[K constraints.Ordered /* comparable */, D any](sorts ...func(rec Record
 
 // RecordValue gets record value from element. It returns ErrRecordNotFound if
 // input record is nil.
-func (o *Omap[K, D]) RecordValue(rec Record) (key K, data D, err error) {
+func RecordValue[K constraints.Ordered /* comparable */, D any](rec Record) (key K, data D, err error) {
 
 	// Return error if input record is nil
 	if rec == nil {
@@ -466,8 +466,8 @@ func (o *Omap[K, D]) insertRecord(key K, data D, direction int, mark Record) (el
 
 // Print move records
 func (o *Omap[K, D]) printMove(before bool, elmove, next *list.Element) {
-	key, _, _ := o.RecordValue(elmove)
-	keyNext, _, _ := o.RecordValue(next)
+	key, _, _ := RecordValue[int, int](elmove)
+	keyNext, _, _ := RecordValue[int, int](next)
 	if before {
 		fmt.Printf("MoveBefore: %v => %v\n", key, keyNext)
 	} else {
