@@ -83,7 +83,7 @@ func New[K comparable, D any](sorts ...Index[K, D]) (o *Omap[K, D], err error) {
 		o.lm[sorts[i].Key] = list.New()
 	}
 
-	return 
+	return
 }
 
 // CompareRecordsByKey compares two records by their keys.
@@ -243,7 +243,7 @@ func (o *Omap[K, D]) Prev(rec *Record[K, D]) *Record[K, D] {
 	return o.elementToRecord(rec.element().Prev())
 }
 
-// Last gets last record from ordered map.
+// Last gets last record from ordered map or nil if the list is empty.
 func (o *Omap[K, D]) Last(idxKeys ...any) *Record[K, D] {
 	o.RLock()
 	defer o.RUnlock()
