@@ -8,7 +8,7 @@ func TestOmap(t *testing.T) {
 	// Enable print move
 	printMove = true
 
-	m := New[int, int](CompareRecordByKey[int, int])
+	m := New(Index[int, int]{Key: "key", Func: CompareRecordsByKey[int, int]})
 
 	t.Log("\nset records:")
 
@@ -107,7 +107,7 @@ func TestOmap(t *testing.T) {
 
 	// Sort records using sort function
 	m.sortFunc(0, func(rec1, rec2 *Record[int, int]) int {
-		return rec1.Key() - rec2.Key()
+		return rec2.Key() - rec1.Key()
 	})
 
 	// Print all records by default(insertion) order
@@ -115,13 +115,13 @@ func TestOmap(t *testing.T) {
 		t.Log(rec.Key(), rec.Data())
 	}
 
-	t.Log("\nlist sorted by keys index:")
+	t.Log("\nlist sorted by key index:")
 
 	// Sort records using sort function
 	// m.SortFunc(0, CompareRecordByKey[int, int])
 
 	// Print all records by key order
-	for rec := m.First(1); rec != nil; rec = m.Next(rec) {
+	for rec := m.First("key"); rec != nil; rec = m.Next(rec) {
 		t.Log(rec.Key(), rec.Data())
 	}
 }
