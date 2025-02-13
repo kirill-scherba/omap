@@ -8,7 +8,10 @@ func TestOmap(t *testing.T) {
 	// Enable print move
 	printMove = true
 
-	m := New(Index[int, int]{Key: "key", Func: CompareRecordsByKey[int, int]})
+	m, err := New(Index[int, int]{Key: "key", Func: CompareRecordsByKey[int, int]})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	t.Log("\nset records:")
 
@@ -72,7 +75,7 @@ func TestOmap(t *testing.T) {
 	t.Log("last key :", rec.Key(), "data:", rec.Data())
 
 	// Move last record to the front of ordered map
-	err := m.MoveToFront(rec)
+	err = m.MoveToFront(rec)
 	first := m.First()
 	if first == nil {
 		t.Fatal("first record is nil")

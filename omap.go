@@ -19,9 +19,10 @@ import (
 )
 
 var (
-	ErrMapIsEmpty     = errors.New("map is empty")
-	ErrRecordNotFound = errors.New("record not found")
-	ErrKeyAllreadySet = errors.New("key allready exists")
+	ErrMapIsEmpty        = errors.New("map is empty")
+	ErrRecordNotFound    = errors.New("record not found")
+	ErrKeyAllreadySet    = errors.New("key allready exists")
+	ErrIncorrectIndexKey = errors.New("incorrect index key name")
 )
 
 var printMove = false
@@ -55,10 +56,10 @@ type Index[K comparable, D any] struct {
 type SortIndexFunc[K comparable, D any] func(rec, next *Record[K, D]) int
 
 // New creates a new ordered map object with key of type T and data of type D.
-func New[K comparable, D any](sorts ...Index[K, D]) *Omap[K, D] {
+func New[K comparable, D any](sorts ...Index[K, D]) (o *Omap[K, D], err error) {
 
 	// Create new ordered map object and make maps
-	o := new(Omap[K, D])
+	o = new(Omap[K, D])
 	o.m = make(dataMap[K, D])
 	o.lm = make(listMap)
 	o.sm = make(indexMap[K, D])
@@ -74,14 +75,15 @@ func New[K comparable, D any](sorts ...Index[K, D]) *Omap[K, D] {
 	for i := range sorts {
 		// Skip default sort index TODO: return error
 		if sorts[i].Key == 0 {
-			continue
+			err = ErrIncorrectIndexKey
+			return
 		}
 		// Add sort index function and create new list
 		o.sm[sorts[i].Key] = sorts[i].Func
 		o.lm[sorts[i].Key] = list.New()
 	}
 
-	return o
+	return 
 }
 
 // CompareRecordsByKey compares two records by their keys.
@@ -217,22 +219,6 @@ func (o *Omap[K, D]) First(idxKeys ...any) *Record[K, D] {
 	}
 
 	return o.elementToRecord(list.Front())
-}
-
-// getList gets list from ordered map by index key. If index key is not set,
-// the function will return default list.
-func (o *Omap[K, D]) getList(idxKeys ...any) (list *list.List, ok bool) {
-	var idxKey any = 0
-
-	// Use first index key if it is set
-	if len(idxKeys) > 0 {
-		idxKey = idxKeys[0]
-	}
-
-	// Get list by index key
-	list, ok = o.lm[idxKey]
-
-	return
 }
 
 // Next gets next record from ordered map or nil if there is last record or input
@@ -381,7 +367,7 @@ func (o *Omap[K, D]) MoveAfter(rec, mark *Record[K, D]) (err error) {
 }
 
 // sortFunc sorts records using sort function. Unsafe (does not lock).
-func (o *Omap[K, D]) sortFunc(idx any, f func(rec, next *Record[K, D]) int) {
+func (o *Omap[K, D]) sortFunc(key any, f func(rec, next *Record[K, D]) int) {
 
 	// Skip if f function not set
 	if f == nil {
@@ -389,7 +375,7 @@ func (o *Omap[K, D]) sortFunc(idx any, f func(rec, next *Record[K, D]) int) {
 	}
 
 	// Get index list by key
-	l, ok := o.getList(idx)
+	l, ok := o.getList(key)
 	if !ok {
 		return
 	}
@@ -398,16 +384,16 @@ func (o *Omap[K, D]) sortFunc(idx any, f func(rec, next *Record[K, D]) int) {
 	var next *list.Element
 	for el := l.Front(); el != nil; el = next {
 		next = el.Next()
-		o.sortRecord(idx, el, f)
+		o.sortRecord(key, el, f)
 	}
 }
 
 // sortRecord sorts record using sort function.
-func (o *Omap[K, D]) sortRecord(idx any, elToMove *list.Element, f func(rec,
+func (o *Omap[K, D]) sortRecord(key any, elToMove *list.Element, f func(rec,
 	next *Record[K, D]) int) {
 
 	// Get index list by key
-	list, ok := o.getList(idx)
+	list, ok := o.getList(key)
 	if !ok {
 		return
 	}
@@ -423,7 +409,7 @@ func (o *Omap[K, D]) sortRecord(idx any, elToMove *list.Element, f func(rec,
 			// If move is set, than move elToMove record
 			if move {
 				list.MoveAfter(elToMove, el)
-				o.printMove(idx, false, elToMove, el)
+				o.printMove(key, false, elToMove, el)
 			}
 			break
 		}
@@ -437,7 +423,7 @@ func (o *Omap[K, D]) sortRecord(idx any, elToMove *list.Element, f func(rec,
 		// If move is set, than move elToMove record
 		if move {
 			list.MoveBefore(elToMove, elNext)
-			o.printMove(idx, true, elToMove, elNext)
+			o.printMove(key, true, elToMove, elNext)
 		}
 
 		break
@@ -501,19 +487,35 @@ func (o *Omap[K, D]) sortLists() {
 	}
 }
 
+// getList gets list from ordered map by index key. If index key is not set,
+// the function will return default list.
+func (o *Omap[K, D]) getList(idxKeys ...any) (list *list.List, ok bool) {
+	var idxKey any = 0
+
+	// Use first index key if it is set
+	if len(idxKeys) > 0 {
+		idxKey = idxKeys[0]
+	}
+
+	// Get list by index key
+	list, ok = o.lm[idxKey]
+
+	return
+}
+
 // Print move records. To enable print move set printMove variable to true.
-func (o *Omap[K, D]) printMove(idx any, before bool, el, next *list.Element) {
+func (o *Omap[K, D]) printMove(idxKey any, before bool, el, next *list.Element) {
 
 	if !printMove {
 		return
 	}
 
-	key := o.elementToRecord(el).Key()
+	keyFirsf := o.elementToRecord(el).Key()
 	keyNext := o.elementToRecord(next).Key()
 
 	if before {
-		fmt.Printf("idx: %v, MoveBefore: %v => %v\n", idx, key, keyNext)
+		fmt.Printf("idx: %v, MoveBefore: %v => %v\n", idxKey, keyFirsf, keyNext)
 	} else {
-		fmt.Printf("idx: %v, MoveAfter: %v => %v\n", idx, key, keyNext)
+		fmt.Printf("idx: %v, MoveAfter: %v => %v\n", idxKey, keyFirsf, keyNext)
 	}
 }
