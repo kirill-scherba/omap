@@ -5,7 +5,7 @@ import "testing"
 func TestOmap(t *testing.T) {
 	t.Log("test")
 
-	m := New[int, int]()
+	m := New[int, int](CompareRecordByKey[int, int])
 	m.Set(1, 2)
 	m.Set(2, 3)
 	m.Set(3, 4)
@@ -32,6 +32,8 @@ func TestOmap(t *testing.T) {
 		d, ok := m.Get(int(i))
 		t.Log(i, ok, d)
 	}
+
+	t.Log()
 
 	// Get first record from ordered map
 	rec := m.First()
@@ -79,14 +81,25 @@ func TestOmap(t *testing.T) {
 	}
 
 	// Sort records using sort function
-	m.SortFunc(func(rec1, rec2 Record) int {
+	m.sortFunc(0, func(rec1, rec2 Record) int {
 		v1, _, _ := m.RecordValue(rec1)
 		v2, _, _ := m.RecordValue(rec2)
 		return v2 - v1
 	})
 
-	// Print all records
+	// Print all records by default(insertion) order
 	for rec := m.First(); rec != nil; rec = m.Next(rec) {
+		key, d, err := m.RecordValue(rec)
+		t.Log(key, d, err)
+	}
+
+	t.Log("\nlist by keys:")
+
+	// Sort records using sort function
+	// m.SortFunc(0, CompareRecordByKey[int, int])
+
+	// Print all records by key order
+	for rec := m.First(1); rec != nil; rec = m.Next(rec) {
 		key, d, err := m.RecordValue(rec)
 		t.Log(key, d, err)
 	}
