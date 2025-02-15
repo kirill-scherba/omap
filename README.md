@@ -69,7 +69,23 @@ func main() {
 }
 ```
 
-## Basic usage example
+This code creates a new omap, inserts some key-value pairs, and then iterates over the omap in order, printing out each key-value pair.
+
+## Conclusion
+
+The omap Go package is a useful library for working with ordered maps in Go. Its fast lookups, efficient insertion and deletion, and ordered iteration make it a great choice for a variety of use cases. Whether you're working with configuration files, caching, or data processing pipelines, omap is definitely worth considering.
+
+## Example Use Cases
+
+- Configuration files: Use omap to store configuration data in a specific order, making it easy to iterate over the configuration and apply settings in the correct order.
+
+- Caching: Use omap to store cached data in a specific order, making it easy to iterate over the cache and evict items in the correct order.
+
+- Data processing pipelines: Use omap to store data in a specific order, making it easy to iterate over the data and process it in the correct order.
+
+## Examples
+
+### Basic usage example
 
 ```go
 package main
@@ -114,7 +130,7 @@ Execute this example on Go playground: [https://go.dev/play/p/T1VMf1J5n4_H](http
 
 Or run it on your local machine: `go run ./examples/basic/`
 
-## Multiple indexes example
+### Multiple indexes example
 
 By default, the ordered map is created with one default (insertion) index.
 

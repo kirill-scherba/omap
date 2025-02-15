@@ -227,6 +227,26 @@ func (o *Omap[K, D]) ForEach(f func(key K, data D), idxKey ...any) {
 	}
 }
 
+// Pairs returns a slice of key-value pairs in the omap. By default, it iterates
+// over default (insertion) index. Use idxKey to iterate over other indexes.
+func (o *Omap[K, D]) Pairs(idxKey ...any) []Pair[K, D] {
+	o.RLock()
+	defer o.RUnlock()
+
+	pairs := make([]Pair[K, D], 0, len(o.m))
+	for rec := o.First(idxKey...); rec != nil; rec = o.Next(rec) {
+	    pairs = append(pairs, Pair[K, D]{Key: rec.Key(), Value: rec.Data()})
+	}
+
+	return pairs
+}
+
+// Pair represents a key-value pair in the omap.
+type Pair[K comparable, D any] struct {
+	Key   K
+	Value D
+}
+
 // First gets first record from ordered map or nil if map is empty or incorrect
 // index is passed.
 func (o *Omap[K, D]) First(idxKeys ...any) *Record[K, D] {
