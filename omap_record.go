@@ -44,6 +44,6 @@ func (r *Record[K, D]) element() *list.Element {
 }
 
 // elementToRecord converts list element to Record.
-func (o *Omap[K, D]) elementToRecord(el *list.Element) *Record[K, D] {
+func (o *Indexes[K, D]) elementToRecord(el *list.Element) *Record[K, D] {
 	return (*Record[K, D])(el)
 }

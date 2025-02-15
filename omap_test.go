@@ -50,51 +50,51 @@ func TestOmap(t *testing.T) {
 	t.Log()
 
 	// Get first record from ordered map
-	rec := m.First()
+	rec := m.Idx.First()
 	if rec == nil {
 		t.Fatal("first record is nil")
 	}
 	t.Log("first key:", rec.Key(), "data:", rec.Data())
 
 	// Get next record from ordered map
-	rec = m.Next(rec)
+	rec = m.Idx.Next(rec)
 	if rec == nil {
 		t.Fatal("next record is nil")
 	}
 	t.Log("next key :", rec.Key(), "data:", rec.Data())
 
 	// Get previous record from ordered map
-	rec = m.Prev(rec)
+	rec = m.Idx.Prev(rec)
 	if rec == nil {
 		t.Fatal("prev record is nil")
 	}
 	t.Log("prev key :", rec.Key(), "data:", rec.Data())
 
 	// Get last record from ordered map
-	rec = m.Last()
+	rec = m.Idx.Last()
 	if rec == nil {
 		t.Fatal("last record is nil")
 	}
 	t.Log("last key :", rec.Key(), "data:", rec.Data())
 
 	// Move last record to the front of ordered map
-	err = m.MoveToFront(rec)
-	first := m.First()
+	err = m.Idx.MoveToFront(rec)
+	first := m.Idx.First()
 	if first == nil {
 		t.Fatal("first record is nil")
 	}
 	t.Log("first key:", first.Key(), "data:", first.Data(), "err:", err)
 
 	// Get next record from ordered map
-	rec = m.Next(first)
+	rec = m.Idx.Next(first)
 	if rec == nil {
 		t.Fatal("next record is nil")
 	}
 	t.Log("next key :", rec.Key(), "data:", rec.Data(), "err:")
 
 	// Move berfore
-	err = m.MoveBefore(rec, first)
-	first = m.First()
+	err = m.Idx.MoveBefore(rec, first)
+	first = m.Idx.First()
 	if first == nil {
 		t.Fatal("first record is nil")
 	}
@@ -105,20 +105,20 @@ func TestOmap(t *testing.T) {
 	t.Log("\nlist after move records:")
 
 	// Print all records
-	for rec := m.First(); rec != nil; rec = m.Next(rec) {
-		t.Log(rec.Key(), rec.Data())
+	for key, val := range m.Records("key") {
+		t.Log(key, val)
 	}
 
 	t.Log("\nlist sorted by function:")
 
 	// Sort records using sort function
-	m.sortFunc(0, func(rec1, rec2 *Record[int, int]) int {
+	m.Idx.sortFunc(0, func(rec1, rec2 *Record[int, int]) int {
 		return rec2.Key() - rec1.Key()
 	})
 
 	// Print all records by default(insertion) order
-	for rec := m.First(); rec != nil; rec = m.Next(rec) {
-		t.Log(rec.Key(), rec.Data())
+	for key, val := range m.Records() {
+		t.Log(key, val)
 	}
 
 	t.Log("\nlist sorted by key index:")
@@ -127,8 +127,8 @@ func TestOmap(t *testing.T) {
 	// m.SortFunc(0, CompareRecordByKey[int, int])
 
 	// Print all records by key order
-	for rec := m.First("key"); rec != nil; rec = m.Next(rec) {
-		t.Log(rec.Key(), rec.Data())
+	for key, val := range m.Records("key") {
+		t.Log(key, val)
 	}
 }
 
@@ -155,8 +155,8 @@ func TestBasicExample(t *testing.T) {
 
 	// Print all records
 	t.Log("\nlist records ordered by default (insertion):")
-	for rec := o.First(); rec != nil; rec = o.Next(rec) {
-		t.Log(rec.Key(), rec.Data())
+	for key, val := range o.Records() {
+		t.Log(key, val)
 	}
 }
 
