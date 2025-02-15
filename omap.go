@@ -25,7 +25,8 @@ var (
 	ErrIncorrectIndexKey = errors.New("incorrect index key name")
 )
 
-var printMove = false
+// Print mode is variable to enable print debug messages.
+var printMode = false
 
 // Omap is a concurrent safe multi index ordered map.
 type Omap[K comparable, D any] struct {
@@ -86,14 +87,14 @@ func New[K comparable, D any](sorts ...Index[K, D]) (o *Omap[K, D], err error) {
 	return
 }
 
-// CompareRecordsByKey compares two records by their keys.
+// CompareByKey compares two records by their keys.
 //
 // This function returns a negative value if rec1 key is less than rec2 key,
 // zero if the keys are equal, and a positive value if rec1 key is greater
 // than rec2 key.
-func CompareRecordsByKey[K constraints.Ordered, D any](rec1, rec2 *Record[K, D]) int {
-	key1 := rec1.Key()
-	key2 := rec2.Key()
+func CompareByKey[K constraints.Ordered, D any](r1, r2 *Record[K, D]) int {
+	key1 := r1.Key()
+	key2 := r2.Key()
 
 	switch {
 	case key1 > key2:
@@ -216,6 +217,16 @@ func (o *Omap[K, D]) Del(key K) (data D, ok bool) {
 	return
 }
 
+// ForEach calls f for each key and data present in the map.
+func (o *Omap[K, D]) ForEach(f func(key K, data D), idxKey ...any) {
+	o.RLock()
+	defer o.RUnlock()
+
+	for rec := o.First(idxKey...); rec != nil; rec = o.Next(rec) {
+		f(rec.Key(), rec.Data())
+	}
+}
+
 // First gets first record from ordered map or nil if map is empty or incorrect
 // index is passed.
 func (o *Omap[K, D]) First(idxKeys ...any) *Record[K, D] {
@@ -269,7 +280,7 @@ func (o *Omap[K, D]) Last(idxKeys ...any) *Record[K, D] {
 
 // InsertBefore inserts record before element. Returns ErrKeyAllreadySet if key
 // allready exists.
-func (o *Omap[K, D]) InsertBefore(idx int, key K, data D, mark *Record[K, D]) (
+func (o *Omap[K, D]) InsertBefore(key K, data D, mark *Record[K, D]) (
 	err error) {
 
 	o.Lock()
@@ -289,7 +300,9 @@ func (o *Omap[K, D]) InsertBefore(idx int, key K, data D, mark *Record[K, D]) (
 
 // InsertAfter inserts record after element. Returns ErrKeyAllreadySet if key
 // allready exists.
-func (o *Omap[K, D]) InsertAfter(key K, data D, mark *Record[K, D]) (err error) {
+func (o *Omap[K, D]) InsertAfter(key K, data D, mark *Record[K, D]) (
+	err error) {
+
 	o.Lock()
 	defer o.Unlock()
 
@@ -377,7 +390,7 @@ func (o *Omap[K, D]) MoveAfter(rec, mark *Record[K, D]) (err error) {
 }
 
 // sortFunc sorts records using sort function. Unsafe (does not lock).
-func (o *Omap[K, D]) sortFunc(key any, f func(rec, next *Record[K, D]) int) {
+func (o *Omap[K, D]) sortFunc(idxKey any, f func(rec, next *Record[K, D]) int) {
 
 	// Skip if f function not set
 	if f == nil {
@@ -385,33 +398,35 @@ func (o *Omap[K, D]) sortFunc(key any, f func(rec, next *Record[K, D]) int) {
 	}
 
 	// Get index list by key
-	l, ok := o.getList(key)
+	l, ok := o.getList(idxKey)
 	if !ok {
 		return
 	}
 
 	// Sort records
 	var next *list.Element
+	var sorted = make(map[any]any)
 	for el := l.Front(); el != nil; el = next {
 		next = el.Next()
-		o.sortRecord(key, el, f)
+		if o.sortRecord(idxKey, el, f, sorted) {
+			next = l.Front()
+		}
 	}
+
 }
 
 // sortRecord sorts record using sort function.
-func (o *Omap[K, D]) sortRecord(key any, elToMove *list.Element, f func(rec,
-	next *Record[K, D]) int) {
+func (o *Omap[K, D]) sortRecord(idxKey any, elToMove *list.Element, f func(rec,
+	next *Record[K, D]) int, sorted map[any]any) (move bool) {
 
 	// Get index list by key
-	list, ok := o.getList(key)
+	list, ok := o.getList(idxKey)
 	if !ok {
 		return
 	}
 
 	// Compare el record with next records using function f and move el if
 	// neccessary
-	move := false
-
 	for el, elNext := elToMove, elToMove.Next(); ; el, elNext = elNext, elNext.Next() {
 
 		// When the end of the list is reached
@@ -419,9 +434,24 @@ func (o *Omap[K, D]) sortRecord(key any, elToMove *list.Element, f func(rec,
 			// If move is set, than move elToMove record
 			if move {
 				list.MoveAfter(elToMove, el)
-				o.printMove(key, false, elToMove, el)
+				o.printMove(idxKey, false, elToMove, el)
 			}
 			break
+		}
+
+		// Check if records pair already sorted
+		k1 := o.elementToRecord(elToMove).Key()
+		k2 := o.elementToRecord(elNext).Key()
+		if o.checkPair(sorted, k1, k2) {
+			if printMode {
+				fmt.Printf("   skip %v => %v\n", k1, k2)
+			}
+			continue
+		}
+
+		// Print compare records in printMode
+		if printMode {
+			fmt.Printf("Compare idx: %v, %v => %v\n", idxKey, k1, k2)
 		}
 
 		// Compare elToMove record with elNext record
@@ -433,11 +463,13 @@ func (o *Omap[K, D]) sortRecord(key any, elToMove *list.Element, f func(rec,
 		// If move is set, than move elToMove record
 		if move {
 			list.MoveBefore(elToMove, elNext)
-			o.printMove(key, true, elToMove, elNext)
+			o.printMove(idxKey, true, elToMove, elNext)
 		}
 
 		break
 	}
+
+	return
 }
 
 // Directions const values
@@ -473,28 +505,46 @@ func (o *Omap[K, D]) insertRecord(key K, data D, direction int,
 		rec = o.elementToRecord(o.lm[0].InsertAfter(v, mark.element()))
 	}
 
-	// Add element to back of additional lists and sort this lists
+	// Add element to back of additional index lists and sort this lists
+	var wg sync.WaitGroup
 	for k := range o.lm {
+		// Skip basic insertion list
 		if k == 0 {
 			continue
 		}
-		o.lm[k].PushBack(v)
-		o.sortFunc(k, o.sm[k])
+
+		// Add element to end of list
+		o.lm[k].PushFront(v)
+
+		// Sort list
+		wg.Add(1)
+		go func() {
+			o.sortFunc(k, o.sm[k])
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 
 	return
 }
 
 // sortLists sorts all additional lists.
 func (o *Omap[K, D]) sortLists() {
+	var wg sync.WaitGroup
 	for k := range o.sm {
 		// Skip basic insertion list
 		if k == 0 {
 			continue
 		}
-		// Sort additional list
-		o.sortFunc(k, o.sm[k])
+
+		// Sort list
+		wg.Add(1)
+		go func() {
+			o.sortFunc(k, o.sm[k])
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 }
 
 // getList gets list from ordered map by index key. If index key is not set,
@@ -513,19 +563,43 @@ func (o *Omap[K, D]) getList(idxKeys ...any) (list *list.List, ok bool) {
 	return
 }
 
+// checkPair checks if record pair is allready sorted.
+//
+// The function takes pair of records keys prepared to compare and checks if
+// this pair is allready sorted. If pair is sorted, the function returns true,
+// otherwise it returns false.
+func (o *Omap[K, D]) checkPair(sorted map[any]any, k1, k2 any) bool {
+	// Create array of sorted pair
+	sk := []struct{ k1, k2 any }{{k1, k2}, {k2, k1}}
+
+	// Check if pair is allready sorted
+	for _, k := range sk {
+		if _, ok := sorted[k]; ok {
+			return true
+		}
+	}
+
+	// Add pair to sorted map
+	sorted[sk[0]] = nil
+
+	return false
+}
+
 // Print move records. To enable print move set printMove variable to true.
 func (o *Omap[K, D]) printMove(idxKey any, before bool, el, next *list.Element) {
 
-	if !printMove {
+	if !printMode {
 		return
 	}
 
-	keyFirsf := o.elementToRecord(el).Key()
+	keyFirst := o.elementToRecord(el).Key()
 	keyNext := o.elementToRecord(next).Key()
 
 	if before {
-		fmt.Printf("idx: %v, MoveBefore: %v => %v\n", idxKey, keyFirsf, keyNext)
+		fmt.Printf("Move    idx: %v, MoveBefore: %v => %v\n",
+			idxKey, keyFirst, keyNext)
 	} else {
-		fmt.Printf("idx: %v, MoveAfter: %v => %v\n", idxKey, keyFirsf, keyNext)
+		fmt.Printf("Move    idx: %v, MoveAfter: %v => %v\n",
+			idxKey, keyFirst, keyNext)
 	}
 }

@@ -11,12 +11,7 @@ import "container/list"
 // Record is a struct that contains list element and methods.
 type Record[K comparable, D any] list.Element
 
-// elementToRecord converts list element to Record.
-func (o *Omap[K, D]) elementToRecord(el *list.Element) *Record[K, D] {
-	return (*Record[K, D])(el)
-}
-
-// recordValue is a struct that contains key and value of ordered map. It is 
+// recordValue is a struct that contains key and value of ordered map. It is
 // used to store key and data in list element.
 type recordValue[K comparable, D any] struct {
 	Key  K
@@ -42,4 +37,9 @@ func (r *Record[K, D]) Data() (data D) {
 // element returns list element from record.
 func (r *Record[K, D]) element() *list.Element {
 	return (*list.Element)(r)
+}
+
+// elementToRecord converts list element to Record.
+func (o *Omap[K, D]) elementToRecord(el *list.Element) *Record[K, D] {
+	return (*Record[K, D])(el)
 }

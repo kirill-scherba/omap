@@ -1,14 +1,17 @@
 package omap
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestOmap(t *testing.T) {
-	t.Log("test")
+	t.Log("TestOmap")
 
 	// Enable print move
-	printMove = true
+	printMode = true
 
-	m, err := New(Index[int, int]{Key: "key", Func: CompareRecordsByKey[int, int]})
+	m, err := New(Index[int, int]{Key: "key", Func: CompareByKey[int, int]})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,4 +130,128 @@ func TestOmap(t *testing.T) {
 	for rec := m.First("key"); rec != nil; rec = m.Next(rec) {
 		t.Log(rec.Key(), rec.Data())
 	}
+}
+
+func TestBasicExample(t *testing.T) {
+	t.Log("TestBasicExample")
+
+	// Struct to store in ordered map
+	type Person struct {
+		Name string
+		Age  int
+	}
+
+	// Create new ordered map
+	o, err := New[string, Person]()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add records to ordered map
+	o.Set("John", Person{Name: "John", Age: 30})
+	o.Set("Jane", Person{Name: "Jane", Age: 25})
+	o.Set("Bob", Person{Name: "Bob", Age: 40})
+	o.Set("Alice", Person{Name: "Alice", Age: 35})
+
+	// Print all records
+	t.Log("\nlist records ordered by default (insertion):")
+	for rec := o.First(); rec != nil; rec = o.Next(rec) {
+		t.Log(rec.Key(), rec.Data())
+	}
+}
+
+func TestForEach(t *testing.T) {
+	t.Log("TestBasicExample")
+
+	// Struct to store in ordered map
+	type Person struct {
+		Name string
+		Age  int
+	}
+
+	// Create new ordered map
+	o, err := New[string, *Person]()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add records to ordered map
+	o.Set("John", &Person{Name: "John", Age: 30})
+	o.Set("Jane", &Person{Name: "Jane", Age: 25})
+	o.Set("Bob", &Person{Name: "Bob", Age: 40})
+	o.Set("Alice", &Person{Name: "Alice", Age: 35})
+
+	// Print all records
+	t.Log("\nlist records ordered by default (insertion):")
+	o.ForEach(func(key string, data *Person) {
+		t.Log(key, data)
+	})
+}
+
+// Struct to store in ordered map
+type Person struct {
+	Name string
+	Age  int
+}
+
+func TestForEachIndex(t *testing.T) {
+	t.Log("TestBasicExample")
+
+	printMode = true
+
+	// Create new ordered map with indexes by Name and Age
+	o, err := New(
+		Index[string, *Person]{Key: "Name", Func: CompareRecordsByName},
+		Index[string, *Person]{Key: "Key", Func: CompareByKey[string, *Person]},
+		Index[string, *Person]{Key: "AgeAsc", Func: CompareRecordsByAgeAsc},
+		Index[string, *Person]{Key: "AgeDesc", Func: CompareRecordsByAgeDesc},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add records to ordered map
+	o.Set("John", &Person{Name: "John", Age: 30})
+	o.Set("Jane", &Person{Name: "Jane", Age: 25})
+	o.Set("Bob", &Person{Name: "Bob", Age: 40})
+	o.Set("Alice", &Person{Name: "Alice", Age: 35})
+
+	// Print all records ordered by default (insertion)
+	t.Log("\nlist records ordered by default (insertion):")
+	o.ForEach(func(key string, data *Person) {
+		t.Log(key, data)
+	})
+
+	// Print all records ordered by Name index
+	t.Log("\nlist records ordered by Name index:")
+	o.ForEach(func(key string, data *Person) {
+		t.Log(key, data)
+	}, "Name")
+
+	// Print all records by Age index
+	t.Log("\nlist records ordered by Age ascending index:")
+	o.ForEach(func(key string, data *Person) {
+		t.Log(key, data)
+	}, "AgeAsc")
+
+	// Print all records by Age index
+	t.Log("\nlist records ordered by Age descending index:")
+	o.ForEach(func(key string, data *Person) {
+		t.Log(key, data)
+	}, "AgeDesc")
+
+}
+
+func CompareRecordsByName(r1, r2 *Record[string, *Person]) int {
+	return strings.Compare(
+		strings.ToLower(r1.Data().Name), strings.ToLower(r2.Data().Name),
+	)
+}
+
+func CompareRecordsByAgeAsc(r1, r2 *Record[string, *Person]) int {
+	return r1.Data().Age - r2.Data().Age
+}
+
+func CompareRecordsByAgeDesc(r1, r2 *Record[string, *Person]) int {
+	return r2.Data().Age - r1.Data().Age
 }
