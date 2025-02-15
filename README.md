@@ -9,6 +9,8 @@ iterated over to retrieve the items in the order they were added.
 [![GoDoc](https://godoc.org/github.com/kirill-scherba/omap?status.svg)](https://godoc.org/github.com/kirill-scherba/omap/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kirill-scherba/omap)](https://goreportcard.com/report/github.com/kirill-scherba/omap)
 
+![Omap](img/omap.jpg)
+
 ## Introduction to the omap Go Package
 
 The omap Go package is a lightweight and efficient library for working with
@@ -33,7 +35,6 @@ fast and efficient.
 
 - Efficient insertion and deletion: omap uses a linked list to store the order of
 key-value pairs, making insertion and deletion operations efficient.
-Using omap
 
 ## Using omap
 
@@ -75,6 +76,10 @@ func main() {
 ```
 
 This code creates a new omap, inserts some key-value pairs, and then iterates over the omap in order, printing out each key-value pair.
+
+Execute this example on Go playground: [https://go.dev/play/p/LzauNwMuezB](https://go.dev/play/p/LzauNwMuezB)
+
+Or run it on your local machine: `go run ./examples/pairs/`
 
 ## Conclusion
 
