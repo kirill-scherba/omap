@@ -9,6 +9,66 @@ iterated over to retrieve the items in the order they were added.
 [![GoDoc](https://godoc.org/github.com/kirill-scherba/omap?status.svg)](https://godoc.org/github.com/kirill-scherba/omap/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kirill-scherba/omap)](https://goreportcard.com/report/github.com/kirill-scherba/omap)
 
+## Introduction to the omap Go Package
+
+The omap Go package is a lightweight and efficient library for working with
+ordered maps in Go. An ordered map is a data structure that combines the
+benefits of a map and a list, allowing you to store key-value pairs in a
+specific order.
+
+## What is omap?
+
+Omap is a Go package that provides an implementation of an ordered map. It is
+designed to be fast, efficient, and easy to use. Omap is particularly useful
+when you need to store data in a specific order, such as when working with
+configuration files, caching, or data processing pipelines.
+
+## Key Features of omap
+
+- Ordered: omap preserves the order in which key-value pairs are inserted,
+allowing you to iterate over the map in a specific order.
+
+- Fast lookups: omap uses a hash table to store key-value pairs, making lookups
+fast and efficient.
+
+- Efficient insertion and deletion: omap uses a linked list to store the order of
+key-value pairs, making insertion and deletion operations efficient.
+Using omap
+
+## Using omap
+
+To use omap, you can install it using the following command:
+
+```bash
+go get github.com/kirill-scherba/omap
+```
+
+Here is an example of how to use omap:
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/fatih/omap"
+)
+
+func main() {
+    // Create a new omap
+    m := omap.New()
+
+    // Insert some key-value pairs
+    m.Set("key1", "value1")
+    m.Set("key2", "value2")
+    m.Set("key3", "value3")
+
+    // Iterate over the omap in order
+    for _, pair := range m.Pairs() {
+        fmt.Printf("%s: %s\n", pair.Key, pair.Value)
+    }
+}
+```
+
 ## Basic usage example
 
 ```go
