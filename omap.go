@@ -56,6 +56,12 @@ type Index[K comparable, D any] struct {
 }
 type SortIndexFunc[K comparable, D any] func(rec, next *Record[K, D]) int
 
+// Pair represents a key-value pair in the ordered map.
+type Pair[K comparable, D any] struct {
+	Key   K
+	Value D
+}
+
 // New creates a new ordered map object with key of type T and data of type D.
 func New[K comparable, D any](sorts ...Index[K, D]) (o *Omap[K, D], err error) {
 
@@ -217,13 +223,53 @@ func (o *Omap[K, D]) Del(key K) (data D, ok bool) {
 	return
 }
 
-// ForEach calls f for each key and data present in the map.
+// ForEach calls function f for each key and value present in the map.
+//
+// By default, it iterates over default (insertion) index. Use idxKey to iterate
+// over other indexes.
+//
+// Function f is called for each key and value present in the map. The order of 
+// iteration is determined by the index. If the index is not specified, the 
+// default (insertion) index is used.
 func (o *Omap[K, D]) ForEach(f func(key K, data D), idxKey ...any) {
 	o.RLock()
 	defer o.RUnlock()
 
 	for rec := o.First(idxKey...); rec != nil; rec = o.Next(rec) {
 		f(rec.Key(), rec.Data())
+	}
+}
+
+// ForEachRecord calls function f for each record present in the map.
+//
+// By default, it iterates over default (insertion) index. Use idxKey to iterate
+// over other indexes.
+//
+// It allows to handle records directly, which could be useful for example to
+// call methods on the record, or to get the index of the record in the list.
+func (o *Omap[K, D]) ForEachRecord(f func(rec *Record[K, D]), idxKey ...any) {
+	o.RLock()
+	defer o.RUnlock()
+
+	for rec := o.First(idxKey...); rec != nil; rec = o.Next(rec) {
+		f(rec)
+	}
+}
+
+// ForEachPair calls function f for each key-value pair present in the map.
+//
+// By default, it iterates over default (insertion) index. Use idxKey to iterate
+// over other indexes.
+//
+// It allows to handle key-value pairs directly, which could be useful for
+// example to call methods on the pair, or to get the index of the pair in the
+// list.
+func (o *Omap[K, D]) ForEachPair(f func(pair Pair[K, D]), idxKey ...any) {
+	o.RLock()
+	defer o.RUnlock()
+
+	for rec := o.First(idxKey...); rec != nil; rec = o.Next(rec) {
+		f(Pair[K, D]{Key: rec.Key(), Value: rec.Data()})
 	}
 }
 
@@ -235,16 +281,10 @@ func (o *Omap[K, D]) Pairs(idxKey ...any) []Pair[K, D] {
 
 	pairs := make([]Pair[K, D], 0, len(o.m))
 	for rec := o.First(idxKey...); rec != nil; rec = o.Next(rec) {
-	    pairs = append(pairs, Pair[K, D]{Key: rec.Key(), Value: rec.Data()})
+		pairs = append(pairs, Pair[K, D]{Key: rec.Key(), Value: rec.Data()})
 	}
 
 	return pairs
-}
-
-// Pair represents a key-value pair in the omap.
-type Pair[K comparable, D any] struct {
-	Key   K
-	Value D
 }
 
 // First gets first record from ordered map or nil if map is empty or incorrect

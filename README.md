@@ -50,12 +50,17 @@ package main
 
 import (
     "fmt"
-    "github.com/fatih/omap"
+    "log"
+
+    "github.com/kirill-scherba/omap"
 )
 
 func main() {
-    // Create a new omap
-    m := omap.New()
+    // Create a new ordered map
+    m, err := omap.New[string, string]()
+    if err != nil {
+        log.Fatal(err)
+    }
 
     // Insert some key-value pairs
     m.Set("key1", "value1")

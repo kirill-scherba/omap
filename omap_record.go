@@ -9,6 +9,10 @@ package omap
 import "container/list"
 
 // Record is a struct that contains list element and methods.
+//
+// We import container/list package to use *list.Element in Record type. We
+// use *list.Element to make Record type compatible with *list.Element, so we
+// can use Record as *list.Element.
 type Record[K comparable, D any] list.Element
 
 // recordValue is a struct that contains key and value of ordered map. It is
@@ -26,7 +30,7 @@ func (r *Record[K, D]) Key() (key K) {
 	return
 }
 
-// Data returns record data.
+// Data returns record data (value).
 func (r *Record[K, D]) Data() (data D) {
 	if v, ok := r.Value.(recordValue[K, D]); ok {
 		data = v.Data
