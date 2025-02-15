@@ -21,7 +21,7 @@ import (
 var (
 	ErrMapIsEmpty        = errors.New("map is empty")
 	ErrRecordNotFound    = errors.New("record not found")
-	ErrKeyAllreadySet    = errors.New("key allready exists")
+	ErrKeyAllreadySet    = errors.New("key already exists")
 	ErrIncorrectIndexKey = errors.New("incorrect index key name")
 )
 
@@ -156,12 +156,12 @@ func (o *Omap[K, D]) GetRecord(key K) (rec *Record[K, D], ok bool) {
 }
 
 // Set adds or updates record in ordered map by key. It adds new record to the
-// back of ordered map. If key allready exists, it will be updated.
+// back of ordered map. If key already exists, it will be updated.
 func (o *Omap[K, D]) Set(key K, data D) (err error) {
 	o.Lock()
 	defer o.Unlock()
 
-	// Check if key allready exists and update data and sort lists if exists
+	// Check if key already exists and update data and sort lists if exists
 	if el, ok := o.m[key]; ok {
 		el.Value = data
 		o.sortLists()
@@ -175,12 +175,12 @@ func (o *Omap[K, D]) Set(key K, data D) (err error) {
 }
 
 // SetFirst adds or updates record in ordered map by key. It adds new record to
-// the front of ordered map. If key allready exists, it will be updated.
+// the front of ordered map. If key already exists, it will be updated.
 func (o *Omap[K, D]) SetFirst(key K, data D) (err error) {
 	o.Lock()
 	defer o.Unlock()
 
-	// Check if key allready exists and update data and sort lists if exists
+	// Check if key already exists and update data and sort lists if exists
 	if el, ok := o.m[key]; ok {
 		el.Value = data
 		o.sortLists()
@@ -279,14 +279,14 @@ func (o *Omap[K, D]) Last(idxKeys ...any) *Record[K, D] {
 }
 
 // InsertBefore inserts record before element. Returns ErrKeyAllreadySet if key
-// allready exists.
+// already exists.
 func (o *Omap[K, D]) InsertBefore(key K, data D, mark *Record[K, D]) (
 	err error) {
 
 	o.Lock()
 	defer o.Unlock()
 
-	// Check if key allready exists
+	// Check if key already exists
 	if _, ok := o.m[key]; ok {
 		err = ErrKeyAllreadySet
 		return
@@ -299,14 +299,14 @@ func (o *Omap[K, D]) InsertBefore(key K, data D, mark *Record[K, D]) (
 }
 
 // InsertAfter inserts record after element. Returns ErrKeyAllreadySet if key
-// allready exists.
+// already exists.
 func (o *Omap[K, D]) InsertAfter(key K, data D, mark *Record[K, D]) (
 	err error) {
 
 	o.Lock()
 	defer o.Unlock()
 
-	// Check if key allready exists
+	// Check if key already exists
 	if _, ok := o.m[key]; ok {
 		err = ErrKeyAllreadySet
 		return
@@ -426,7 +426,7 @@ func (o *Omap[K, D]) sortRecord(idxKey any, elToMove *list.Element, f func(rec,
 	}
 
 	// Compare el record with next records using function f and move el if
-	// neccessary
+	// necessary
 	for el, elNext := elToMove, elToMove.Next(); ; el, elNext = elNext, elNext.Next() {
 
 		// When the end of the list is reached
@@ -563,16 +563,16 @@ func (o *Omap[K, D]) getList(idxKeys ...any) (list *list.List, ok bool) {
 	return
 }
 
-// checkPair checks if record pair is allready sorted.
+// checkPair checks if record pair is already sorted.
 //
 // The function takes pair of records keys prepared to compare and checks if
-// this pair is allready sorted. If pair is sorted, the function returns true,
+// this pair is already sorted. If pair is sorted, the function returns true,
 // otherwise it returns false.
 func (o *Omap[K, D]) checkPair(sorted map[any]any, k1, k2 any) bool {
 	// Create array of sorted pair
 	sk := []struct{ k1, k2 any }{{k1, k2}, {k2, k1}}
 
-	// Check if pair is allready sorted
+	// Check if pair is already sorted
 	for _, k := range sk {
 		if _, ok := sorted[k]; ok {
 			return true
