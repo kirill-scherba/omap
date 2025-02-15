@@ -228,8 +228,8 @@ func (o *Omap[K, D]) Del(key K) (data D, ok bool) {
 // By default, it iterates over default (insertion) index. Use idxKey to iterate
 // over other indexes.
 //
-// Function f is called for each key and value present in the map. The order of 
-// iteration is determined by the index. If the index is not specified, the 
+// Function f is called for each key and value present in the map. The order of
+// iteration is determined by the index. If the index is not specified, the
 // default (insertion) index is used.
 func (o *Omap[K, D]) ForEach(f func(key K, data D), idxKey ...any) {
 	o.RLock()
@@ -285,6 +285,20 @@ func (o *Omap[K, D]) Pairs(idxKey ...any) []Pair[K, D] {
 	}
 
 	return pairs
+}
+
+// Refresh refreshes the index lists.
+//
+// The indexes automatically sorts when a new record is added or updated with 
+// the Set or SetFirst methods.
+//
+// If you directly update the map data (D type) use this method to refresh the
+// index lists.
+func (o *Omap[K, D]) Refresh() {
+	o.Lock()
+	defer o.Unlock()
+
+	o.sortLists()
 }
 
 // First gets first record from ordered map or nil if map is empty or incorrect
@@ -588,7 +602,7 @@ func (o *Omap[K, D]) insertRecord(key K, data D, direction int,
 	return
 }
 
-// sortLists sorts all additional lists.
+// sortLists sorts all additional index lists.
 func (o *Omap[K, D]) sortLists() {
 	var wg sync.WaitGroup
 	for k := range o.sm {
