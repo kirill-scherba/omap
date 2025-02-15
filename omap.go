@@ -13,6 +13,7 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"iter"
 	"sync"
 
 	"golang.org/x/exp/constraints"
@@ -287,9 +288,29 @@ func (o *Omap[K, D]) Pairs(idxKey ...any) []Pair[K, D] {
 	return pairs
 }
 
+// Records returns an iterator over the omap records. By default, it iterates
+// over default (insertion) index. Use idxKey to iterate over other indexes.
+//
+// The iteration stops when the function passed to the iterator returns false.
+//
+// This function is safe for concurrent read access. But all write Omap methods
+// will lock during iteration.
+func (o *Omap[K, D]) Records(idxKey ...any) iter.Seq2[K, D] {
+	return func(yield func(K, D) bool) {
+		o.RLock()
+		defer o.RUnlock()
+
+		for rec := o.First(idxKey...); rec != nil; rec = o.Next(rec) {
+			if !yield(rec.Key(), rec.Data()) {
+				return
+			}
+		}
+	}
+}
+
 // Refresh refreshes the index lists.
 //
-// The indexes automatically sorts when a new record is added or updated with 
+// The indexes automatically sorts when a new record is added or updated with
 // the Set or SetFirst methods.
 //
 // If you directly update the map data (D type) use this method to refresh the
