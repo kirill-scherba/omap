@@ -161,7 +161,7 @@ func TestBasicExample(t *testing.T) {
 }
 
 func TestForEach(t *testing.T) {
-	t.Log("TestBasicExample")
+	t.Log("TestForEach")
 
 	// Struct to store in ordered map
 	type Person struct {
@@ -195,16 +195,16 @@ type Person struct {
 }
 
 func TestForEachIndex(t *testing.T) {
-	t.Log("TestBasicExample")
+	t.Log("TestForEachIndex")
 
 	printMode = true
 
 	// Create new ordered map with indexes by Name and Age
 	o, err := New(
-		Index[string, *Person]{Key: "Name", Func: CompareRecordsByName},
+		Index[string, *Person]{Key: "Name", Func: CompareByName},
 		Index[string, *Person]{Key: "Key", Func: CompareByKey[string, *Person]},
-		Index[string, *Person]{Key: "AgeAsc", Func: CompareRecordsByAgeAsc},
-		Index[string, *Person]{Key: "AgeDesc", Func: CompareRecordsByAgeDesc},
+		Index[string, *Person]{Key: "AgeAsc", Func: CompareByAgeAsc},
+		Index[string, *Person]{Key: "AgeDesc", Func: CompareByAgeDesc},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -242,16 +242,16 @@ func TestForEachIndex(t *testing.T) {
 
 }
 
-func CompareRecordsByName(r1, r2 *Record[string, *Person]) int {
+func CompareByName(r1, r2 *Record[string, *Person]) int {
 	return strings.Compare(
 		strings.ToLower(r1.Data().Name), strings.ToLower(r2.Data().Name),
 	)
 }
 
-func CompareRecordsByAgeAsc(r1, r2 *Record[string, *Person]) int {
+func CompareByAgeAsc(r1, r2 *Record[string, *Person]) int {
 	return r1.Data().Age - r2.Data().Age
 }
 
-func CompareRecordsByAgeDesc(r1, r2 *Record[string, *Person]) int {
+func CompareByAgeDesc(r1, r2 *Record[string, *Person]) int {
 	return r2.Data().Age - r1.Data().Age
 }
