@@ -19,10 +19,11 @@ import (
 )
 
 var (
-	ErrMapIsEmpty        = errors.New("map is empty")
-	ErrRecordNotFound    = errors.New("record not found")
-	ErrKeyAllreadySet    = errors.New("key already exists")
-	ErrIncorrectIndexKey = errors.New("incorrect index key name")
+	ErrMapIsEmpty              = errors.New("map is empty")
+	ErrRecordNotFound          = errors.New("record not found")
+	ErrKeyAllreadySet          = errors.New("key already exists")
+	ErrIncorrectIndexKey       = errors.New("incorrect index key name")
+	ErrIncorrectIndexDirection = errors.New("incorrect index direction")
 )
 
 // Print mode is variable to enable print debug messages.
@@ -138,7 +139,31 @@ func (m *Omap[K, D]) Len() int {
 	return len(m.m)
 }
 
-// Get gets record from ordered map by key. Returns ok true if found.
+// Set adds or updates record in ordered map by key. It adds new record to the
+// back of ordered map. If key already exists, its data will be updated.
+func (m *Omap[K, D]) Set(key K, data D) error {
+	m.Lock()
+	defer m.Unlock()
+	return m.set(key, data, back)
+}
+
+// SetFirst adds or updates record in ordered map by key. It adds new record to
+// the front of ordered map. If key already exists, its data will be updated.
+func (m *Omap[K, D]) SetFirst(key K, data D) (err error) {
+	m.Lock()
+	defer m.Unlock()
+	return m.set(key, data, front)
+}
+
+// Exists returns true if key exists in the map.
+func (m *Omap[K, D]) Exists(key K) (exists bool) {
+	m.RLock()
+	defer m.RUnlock()
+	_, exists = m.m[key]
+	return
+}
+
+// Get gets records data from ordered map by key. Returns ok true if found.
 func (m *Omap[K, D]) Get(key K) (data D, ok bool) {
 	m.RLock()
 	defer m.RUnlock()
@@ -150,7 +175,7 @@ func (m *Omap[K, D]) Get(key K) (data D, ok bool) {
 	}
 
 	// Get records data
-	v, _ := el.Value.(recordValue[K, D])
+	v, _ := el.Value.(*recordValue[K, D])
 	data = v.Data
 
 	return
@@ -163,44 +188,6 @@ func (m *Omap[K, D]) GetRecord(key K) (rec *Record[K, D], ok bool) {
 
 	// Get record
 	rec, ok = m.m[key]
-	return
-}
-
-// Set adds or updates record in ordered map by key. It adds new record to the
-// back of ordered map. If key already exists, it will be updated.
-func (m *Omap[K, D]) Set(key K, data D) (err error) {
-	m.Lock()
-	defer m.Unlock()
-
-	// Check if key already exists and update data and sort lists if exists
-	if el, ok := m.m[key]; ok {
-		el.Value = data
-		m.Idx.sort()
-		return
-	}
-
-	// Add new record to back of lists and map
-	m.m[key] = m.Idx.insert(key, data, back, nil)
-
-	return
-}
-
-// SetFirst adds or updates record in ordered map by key. It adds new record to
-// the front of ordered map. If key already exists, it will be updated.
-func (m *Omap[K, D]) SetFirst(key K, data D) (err error) {
-	m.Lock()
-	defer m.Unlock()
-
-	// Check if key already exists and update data and sort lists if exists
-	if el, ok := m.m[key]; ok {
-		el.Value = data
-		m.Idx.sort()
-		return
-	}
-
-	// Add new record to front of lists and map
-	m.m[key] = m.Idx.insert(key, data, front, nil)
-
 	return
 }
 
@@ -324,4 +311,26 @@ func (m *Omap[K, D]) Refresh() {
 	defer m.Unlock()
 
 	m.Idx.sort()
+}
+
+// set unsafe adds or updates record in ordered map by key with direction.
+func (m *Omap[K, D]) set(key K, data D, direction int) (err error) {
+
+	// Check direction
+	if direction != back && direction != front {
+		err = ErrIncorrectIndexDirection
+		return
+	}
+
+	// Check if key already exists. Update data and sort lists if exists
+	if rec, ok := m.m[key]; ok {
+		rec.Update(data)
+		m.Idx.sort()
+		return
+	}
+
+	// Add new record to back of lists and map
+	m.m[key] = m.Idx.insert(key, data, direction, nil)
+
+	return
 }

@@ -279,7 +279,7 @@ func (in *Indexes[K, D]) insert(key K, data D, direction int,
 	mark *Record[K, D]) (rec *Record[K, D]) {
 
 	// Create new record and it to basic(insertion) list
-	v := recordValue[K, D]{Key: key, Data: data}
+	v := &recordValue[K, D]{Key: key, Data: data}
 
 	// Add element to basic(insertion) list
 	switch direction {

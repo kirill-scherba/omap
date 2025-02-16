@@ -24,7 +24,7 @@ type recordValue[K comparable, D any] struct {
 
 // Key returns record key.
 func (r *Record[K, D]) Key() (key K) {
-	if v, ok := r.Value.(recordValue[K, D]); ok {
+	if v, ok := r.Value.(*recordValue[K, D]); ok {
 		key = v.Key
 	}
 	return
@@ -32,10 +32,17 @@ func (r *Record[K, D]) Key() (key K) {
 
 // Data returns record data (value).
 func (r *Record[K, D]) Data() (data D) {
-	if v, ok := r.Value.(recordValue[K, D]); ok {
+	if v, ok := r.Value.(*recordValue[K, D]); ok {
 		data = v.Data
 	}
 	return
+}
+
+// Update updates record data (value).
+func (r *Record[K, D]) Update(data D) {
+	if v, ok := r.Value.(*recordValue[K, D]); ok {
+		v.Data = data
+	}
 }
 
 // element returns list element from record.
