@@ -177,7 +177,8 @@ func (in *Indexes[K, D]) MoveAfter(rec, mark *Record[K, D]) (err error) {
 	return
 }
 
-// sortFunc sorts records using sort function. Unsafe (does not lock).
+// sortFunc sorts records in list by index key using sort function.
+// Unsafe (does not lock).
 func (in *Indexes[K, D]) sortFunc(idxKey any, f func(rec, next *Record[K, D]) int) {
 
 	// Skip if f function not set
@@ -191,21 +192,17 @@ func (in *Indexes[K, D]) sortFunc(idxKey any, f func(rec, next *Record[K, D]) in
 		return
 	}
 
-	// Sort records
+	// Sort records in list
 	var next *list.Element
-	var sorted = make(map[any]any)
 	for el := l.Front(); el != nil; el = next {
 		next = el.Next()
-		if in.sortRecord(idxKey, el, f, sorted) {
-			next = l.Front()
-		}
+		in.sortRecord(idxKey, el, f)
 	}
-
 }
 
 // sortRecord sorts record using sort function.
-func (in *Indexes[K, D]) sortRecord(idxKey any, elToMove *list.Element, f func(rec,
-	next *Record[K, D]) int, sorted map[any]any) (move bool) {
+func (in *Indexes[K, D]) sortRecord(idxKey any, el *list.Element, f func(rec,
+	next *Record[K, D]) int) (move bool) {
 
 	// Get index list by key
 	list, ok := in.getList(idxKey)
@@ -215,46 +212,33 @@ func (in *Indexes[K, D]) sortRecord(idxKey any, elToMove *list.Element, f func(r
 
 	// Compare el record with next records using function f and move el if
 	// necessary
-	for el, elNext := elToMove, elToMove.Next(); ; el, elNext = elNext, elNext.Next() {
+	for next := el.Next(); next != nil; next = next.Next() {
+		rec1, rec2 := in.elementToRecord(el), in.elementToRecord(next)
 
-		// When the end of the list is reached
-		if elNext == nil {
-			// If move is set, than move elToMove record
-			if move {
-				list.MoveAfter(elToMove, el)
-				in.printMove(idxKey, false, elToMove, el)
-			}
-			break
-		}
-
-		// Check if records pair already sorted
-		k1 := in.elementToRecord(elToMove).Key()
-		k2 := in.elementToRecord(elNext).Key()
-		if in.checkPair(sorted, k1, k2) {
-			if printMode {
-				fmt.Printf("   skip %v => %v\n", k1, k2)
-			}
-			continue
-		}
-
-		// Print compare records in printMode
+		// Print in print mode
 		if printMode {
-			fmt.Printf("Compare idx: %v, %v => %v\n", idxKey, k1, k2)
+			fmt.Printf("Compare idx: %v, %v => %v\n",
+				idxKey, rec1.Key(), rec2.Key())
 		}
 
-		// Compare elToMove record with elNext record
-		if f(in.elementToRecord(elToMove), in.elementToRecord(elNext)) > 0 {
+		// Compare elToMove record with next record
+		if f(rec1, rec2) > 0 {
 			move = true
 			continue
 		}
 
 		// If move is set, than move elToMove record
 		if move {
-			list.MoveBefore(elToMove, elNext)
-			in.printMove(idxKey, true, elToMove, elNext)
+			list.MoveBefore(el, next)
+			in.printMove(idxKey, true, el, next)
+			return
 		}
+	}
 
-		break
+	// If move is set, than move elToMove to the back
+	if move {
+		list.MoveToBack(el)
+		in.printMove(idxKey, true, el, el.Prev())
 	}
 
 	return
@@ -301,7 +285,7 @@ func (in *Indexes[K, D]) insert(key K, data D, direction int,
 			continue
 		}
 
-		// Add element to end of list
+		// Add element to the top of list
 		in.lm[k].PushFront(v)
 
 		// Sort list
