@@ -159,6 +159,31 @@ func (in *Indexes[K, D]) MoveBefore(rec, mark *Record[K, D]) (err error) {
 	return
 }
 
+// MoveUp moves record rec to the new position before previous record. It returns
+// ErrRecordNotFound if input record is nil.
+func (in *Indexes[K, D]) MoveUp(rec *Record[K, D]) (err error) {
+	in.Lock()
+	defer in.Unlock()
+
+	// Return error if input record is nil
+	if rec == nil {
+		err = ErrRecordNotFound
+		return
+	}
+
+	// Return error if previous record is nil
+	mark := rec.element().Prev()
+	if mark == nil {
+		err = ErrRecordNotFound
+		return
+	}
+
+	// Move record
+	in.lm[0].MoveBefore(rec.element(), mark)
+
+	return
+}
+
 // MoveAfter moves record rec to the new position after mark record. It returns
 // ErrRecordNotFound if input record or mark record is nil.
 func (in *Indexes[K, D]) MoveAfter(rec, mark *Record[K, D]) (err error) {

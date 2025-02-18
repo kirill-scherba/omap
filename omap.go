@@ -215,6 +215,37 @@ func (m *Omap[K, D]) Del(key K) (data D, ok bool) {
 	return
 }
 
+// DelLast removes last record from ordered map by default index. Returns ok
+// true and deleted record if it was successfully removed.
+func (m *Omap[K, D]) DelLast() (rec *Record[K, D], data D, ok bool) {
+	m.Lock()
+	defer m.Unlock()
+
+	// Get index list by key
+	list, ok := m.Idx.getList()
+	if !ok {
+		return
+	}
+
+	// Get last record
+	rec = m.Idx.elementToRecord(list.Back())
+	if rec == nil {
+		ok = false
+		return
+	}
+
+	// Remove element from lists
+	for k := range m.lm {
+		m.lm[k].Remove(rec.element())
+	}
+
+	// Remove key from map
+	data = rec.Data()
+	delete(m.m, rec.Key())
+
+	return
+}
+
 // ForEach calls function f for each key and value present in the map.
 //
 // By default, it iterates over default (insertion) index. Use idxKey to iterate
