@@ -34,7 +34,8 @@ type Cache[T any] struct {
 // New creates new cache object.
 //
 // Parameters:
-//   - size: the maximum number of elements in the cache.
+//   - size: the maximum number of elements in the cache. If size is 0,
+//     the cache has no limit.
 //
 // Returns:
 //   - c: the new cache object.
@@ -68,7 +69,7 @@ func (c *Cache[T]) Set(key string, data T) (err error) {
 	}
 
 	// Check cache size and remove last record if size is exceeded
-	if c.m.Len() > c.size {
+	if c.size > 0 && c.m.Len() > c.size {
 		// Remove last record from the cache
 		c.m.DelLast()
 	}
