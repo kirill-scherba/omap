@@ -21,13 +21,7 @@ func (in *Indexes[K, D]) First(idxKeys ...any) *Record[K, D] {
 	in.RLock()
 	defer in.RUnlock()
 
-	// Get index list by key
-	list, ok := in.getList(idxKeys...)
-	if !ok {
-		return nil
-	}
-
-	return in.elementToRecord(list.Front())
+	return in.first(idxKeys...)
 }
 
 // Next gets next record from ordered map or nil if there is last record or input
@@ -36,12 +30,7 @@ func (in *Indexes[K, D]) Next(rec *Record[K, D]) *Record[K, D] {
 	in.RLock()
 	defer in.RUnlock()
 
-	// Return nil if input record is nil
-	if rec == nil {
-		return nil
-	}
-
-	return in.elementToRecord(rec.element().Next())
+	return in.next(rec)
 }
 
 // Prev gets previous record from ordered map or nil if this record is first.
@@ -202,6 +191,30 @@ func (in *Indexes[K, D]) MoveAfter(rec, mark *Record[K, D]) (err error) {
 	return
 }
 
+// First gets first record from ordered map or nil if map is empty or incorrect
+// index is passed. Unsafe for concurrent read access.
+func (in *Indexes[K, D]) first(idxKeys ...any) *Record[K, D] {
+	// Get index list by key
+	list, ok := in.getList(idxKeys...)
+	if !ok {
+		return nil
+	}
+
+	return in.elementToRecord(list.Front())
+}
+
+// Next gets next record from ordered map or nil if there is last record or input
+// record is nil. Unsafe for concurrent read access.
+func (in *Indexes[K, D]) next(rec *Record[K, D]) *Record[K, D] {
+
+	// Return nil if input record is nil
+	if rec == nil {
+		return nil
+	}
+
+	return in.elementToRecord(rec.element().Next())
+}
+
 // sortFunc sorts records in list by index key using sort function.
 // Unsafe (does not lock).
 func (in *Indexes[K, D]) sortFunc(idxKey any, f func(rec, next *Record[K, D]) int) {
@@ -314,11 +327,9 @@ func (in *Indexes[K, D]) insert(key K, data D, direction int,
 		in.lm[k].PushFront(v)
 
 		// Sort list
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			in.sortFunc(k, in.sm[k])
-			wg.Done()
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -335,11 +346,9 @@ func (in *Indexes[K, D]) sort() {
 		}
 
 		// Sort list
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			in.sortFunc(k, in.sm[k])
-			wg.Done()
-		}()
+		})
 	}
 	wg.Wait()
 }

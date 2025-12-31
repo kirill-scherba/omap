@@ -242,6 +242,71 @@ func TestForEachIndex(t *testing.T) {
 
 }
 
+func TestRecords(t *testing.T) {
+	t.Log("TestRecords")
+
+	// Create new ordered map with indexes by Name and Age
+	o, err := New(
+		Index[string, *Person]{Key: "Name", Func: CompareByName},
+		Index[string, *Person]{Key: "Key", Func: CompareByKey[string, *Person]},
+		Index[string, *Person]{Key: "AgeAsc", Func: CompareByAgeAsc},
+		Index[string, *Person]{Key: "AgeDesc", Func: CompareByAgeDesc},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add records to ordered map
+	o.Set("John", &Person{Name: "John", Age: 30})
+	o.Set("Jane", &Person{Name: "Jane", Age: 25})
+	o.Set("Bob", &Person{Name: "Bob", Age: 40})
+	o.Set("Alice", &Person{Name: "Alice", Age: 35})
+
+	// Print all records ordered by default (insertion)
+	t.Log("\nlist records ordered by default (insertion):")
+	for key, val := range o.RecordsWrite() {
+		t.Log(key, val)
+
+		// Update value for John"
+		if key == "John" {
+			val.Age = 41
+		}
+	}
+
+	// Refresh records when values using in indexes was changed directly
+	// to recalculate sort indexes.
+	o.Refresh()
+
+	// Print all records ordered by Name index
+	t.Log("\nlist records ordered by Name index:")
+	for key, val := range o.Records("Name") {
+		t.Log(key, val)
+	}
+
+	// Print all records by Age index
+	t.Log("\nlist records ordered by Age ascending index:")
+	for key, val := range o.Records("AgeAsc") {
+		t.Log(key, val)
+	}
+
+	// Update Age using unsafe Set
+	t.Log("\nUpdate Age using unsafe Set:")
+	for key, val := range o.RecordsWrite() {
+
+		// Update value for John"
+		if key == "Jane" {
+			val.Age = 42
+			o.Set("Jane", val, true)
+		}
+	}
+
+	// Print all records by Age index
+	t.Log("\nlist records ordered by Age ascending index:")
+	for key, val := range o.Records("AgeAsc") {
+		t.Log(key, val)
+	}
+}
+
 func CompareByName(r1, r2 *Record[string, *Person]) int {
 	return strings.Compare(
 		strings.ToLower(r1.Data().Name), strings.ToLower(r2.Data().Name),

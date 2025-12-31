@@ -141,17 +141,28 @@ func (m *Omap[K, D]) Len() int {
 
 // Set adds or updates record in ordered map by key. It adds new record to the
 // back of ordered map. If key already exists, its data will be updated.
-func (m *Omap[K, D]) Set(key K, data D) error {
-	m.Lock()
-	defer m.Unlock()
+// Set unsafe to true to skip locking ordered map.
+func (m *Omap[K, D]) Set(key K, data D, unsafe ...bool) error {
+
+	// Lock ordered map if unsafe is not set or if first argument is false
+	if len(unsafe) == 0 || !unsafe[0] {
+		m.Lock()
+		defer m.Unlock()
+	}
+
 	return m.set(key, data, back)
 }
 
 // SetFirst adds or updates record in ordered map by key. It adds new record to
 // the front of ordered map. If key already exists, its data will be updated.
-func (m *Omap[K, D]) SetFirst(key K, data D) (err error) {
-	m.Lock()
-	defer m.Unlock()
+func (m *Omap[K, D]) SetFirst(key K, data D, unsafe ...bool) (err error) {
+
+	// Lock ordered map if unsafe is not set or if first argument is false
+	if len(unsafe) == 0 || !unsafe[0] {
+		m.Lock()
+		defer m.Unlock()
+	}
+
 	return m.set(key, data, front)
 }
 
@@ -246,20 +257,19 @@ func (m *Omap[K, D]) DelLast() (rec *Record[K, D], data D, ok bool) {
 	return
 }
 
-// ForEach calls function f for each key and value present in the map.
+// ForEach calls function f for each key present in the map.
 //
 // By default, it iterates over default (insertion) index. Use idxKey to iterate
 // over other indexes.
 //
-// Function f is called for each key and value present in the map. The order of
+// Function f is called for each key present in the map. The order of
 // iteration is determined by the index. If the index is not specified, the
-// default (insertion) index is used.
+// default (insertion) index is used. The RLock is held during the iteration,
+// so the map cannot be modified during the iteration and any omap methods which
+// uses Lock cannot be used avoid deadlocks.
 func (m *Omap[K, D]) ForEach(f func(key K, data D), idxKey ...any) {
-	m.RLock()
-	defer m.RUnlock()
-
-	for rec := m.Idx.First(idxKey...); rec != nil; rec = m.Idx.Next(rec) {
-		f(rec.Key(), rec.Data())
+	for key, data := range m.records(false, idxKey...) {
+		f(key, data)
 	}
 }
 
@@ -270,11 +280,15 @@ func (m *Omap[K, D]) ForEach(f func(key K, data D), idxKey ...any) {
 //
 // It allows to handle records directly, which could be useful for example to
 // call methods on the record, or to get the index of the record in the list.
+//
+// Function f is called for each key present in the map. The RLock is held
+// during the iteration, so the map cannot be modified during the iteration and
+// any omap methods which uses Lock cannot be used avoid deadlocks.
 func (m *Omap[K, D]) ForEachRecord(f func(rec *Record[K, D]), idxKey ...any) {
 	m.RLock()
 	defer m.RUnlock()
 
-	for rec := m.Idx.First(idxKey...); rec != nil; rec = m.Idx.Next(rec) {
+	for rec := m.Idx.first(idxKey...); rec != nil; rec = m.Idx.next(rec) {
 		f(rec)
 	}
 }
@@ -287,27 +301,30 @@ func (m *Omap[K, D]) ForEachRecord(f func(rec *Record[K, D]), idxKey ...any) {
 // It allows to handle key-value pairs directly, which could be useful for
 // example to call methods on the pair, or to get the index of the pair in the
 // list.
+//
+// Function f is called for each key present in the map. The RLock is held
+// during the iteration, so the map cannot be modified during the iteration and
+// any omap methods which uses Lock cannot be used avoid deadlocks.
 func (m *Omap[K, D]) ForEachPair(f func(pair Pair[K, D]), idxKey ...any) {
-	m.RLock()
-	defer m.RUnlock()
-
-	for rec := m.Idx.First(idxKey...); rec != nil; rec = m.Idx.Next(rec) {
-		f(Pair[K, D]{Key: rec.Key(), Value: rec.Data()})
+	for key, data := range m.records(false, idxKey...) {
+		f(Pair[K, D]{Key: key, Value: data})
 	}
 }
 
 // Pairs returns a slice of key-value pairs in the omap. By default, it iterates
 // over default (insertion) index. Use idxKey to iterate over other indexes.
-func (m *Omap[K, D]) Pairs(idxKey ...any) []Pair[K, D] {
+func (m *Omap[K, D]) Pairs(idxKey ...any) (pairs []Pair[K, D]) {
 	m.RLock()
 	defer m.RUnlock()
 
-	pairs := make([]Pair[K, D], 0, len(m.m))
-	for rec := m.Idx.First(idxKey...); rec != nil; rec = m.Idx.Next(rec) {
-		pairs = append(pairs, Pair[K, D]{Key: rec.Key(), Value: rec.Data()})
+	i := 0
+	pairs = make([]Pair[K, D], len(m.m))
+	for rec := m.Idx.first(idxKey...); rec != nil; rec = m.Idx.next(rec) {
+		pairs[i] = Pair[K, D]{Key: rec.Key(), Value: rec.Data()}
+		i++
 	}
 
-	return pairs
+	return
 }
 
 // Records returns an iterator over the omap records. By default, it iterates
@@ -315,19 +332,21 @@ func (m *Omap[K, D]) Pairs(idxKey ...any) []Pair[K, D] {
 //
 // The iteration stops when the function passed to the iterator returns false.
 //
-// This function is safe for concurrent read access. But all write Omap methods
-// will lock during iteration.
+// This function is safe for concurrent read access. RWmutex is locked by RLock.
+// Don't use other Omap methods which uses mutex inside iterator avoid deadlocks.
 func (m *Omap[K, D]) Records(idxKey ...any) iter.Seq2[K, D] {
-	return func(yield func(K, D) bool) {
-		m.RLock()
-		defer m.RUnlock()
+	return m.records(false, idxKey...)
+}
 
-		for rec := m.Idx.First(idxKey...); rec != nil; rec = m.Idx.Next(rec) {
-			if !yield(rec.Key(), rec.Data()) {
-				return
-			}
-		}
-	}
+// RecordsWrite returns an iterator over the omap records. By default, it iterates
+// over default (insertion) index. Use idxKey to iterate over other indexes.
+//
+// The iteration stops when the function passed to the iterator returns false.
+//
+// This function is safe for concurrent write access. RWmutex is locked by Lock.
+// Don't use other Omap methods which uses mutex inside iterator avoid deadlocks.
+func (m *Omap[K, D]) RecordsWrite(idxKey ...any) iter.Seq2[K, D] {
+	return m.records(true, idxKey...)
 }
 
 // Refresh refreshes the index lists.
@@ -337,11 +356,41 @@ func (m *Omap[K, D]) Records(idxKey ...any) iter.Seq2[K, D] {
 //
 // If you directly update the map data (D type) use this method to refresh the
 // index lists.
+//
+// You should use Lock or RLock to avoid concurrent access when changing the map
+// data directly.
 func (m *Omap[K, D]) Refresh() {
 	m.Lock()
 	defer m.Unlock()
 
 	m.Idx.sort()
+}
+
+// Records returns an iterator over the omap records. By default, it iterates
+// over default (insertion) index. Use idxKey to iterate over other indexes.
+//
+// The iteration stops when the function passed to the iterator returns false.
+//
+// This function is safe for concurrent read access. RWmutex is locked by Lock
+// or RLock depending on the value of write parameter. Don't use other Omap
+// methods which uses mutex inside iterator avoid deadlocks.
+func (m *Omap[K, D]) records(write bool, idxKey ...any) iter.Seq2[K, D] {
+	return func(yield func(K, D) bool) {
+
+		if write {
+			m.Lock()
+			defer m.Unlock()
+		} else {
+			m.RLock()
+			defer m.RUnlock()
+		}
+
+		for rec := m.Idx.first(idxKey...); rec != nil; rec = m.Idx.next(rec) {
+			if !yield(rec.Key(), rec.Data()) {
+				return
+			}
+		}
+	}
 }
 
 // set unsafe adds or updates record in ordered map by key with direction.
@@ -360,7 +409,8 @@ func (m *Omap[K, D]) set(key K, data D, direction int) (err error) {
 		return
 	}
 
-	// Add new record to back of lists and map
+	// Add new record to back or front of lists depending on direction and to
+	// the map
 	m.m[key] = m.Idx.insert(key, data, direction, nil)
 
 	return
