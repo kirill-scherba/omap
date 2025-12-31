@@ -155,6 +155,7 @@ func (m *Omap[K, D]) Set(key K, data D, unsafe ...bool) error {
 
 // SetFirst adds or updates record in ordered map by key. It adds new record to
 // the front of ordered map. If key already exists, its data will be updated.
+// Set unsafe to true to skip locking ordered map.
 func (m *Omap[K, D]) SetFirst(key K, data D, unsafe ...bool) (err error) {
 
 	// Lock ordered map if unsafe is not set or if first argument is false
@@ -167,17 +168,26 @@ func (m *Omap[K, D]) SetFirst(key K, data D, unsafe ...bool) (err error) {
 }
 
 // Exists returns true if key exists in the map.
-func (m *Omap[K, D]) Exists(key K) (exists bool) {
-	m.RLock()
-	defer m.RUnlock()
+func (m *Omap[K, D]) Exists(key K, unsafe ...bool) (exists bool) {
+
+	// Lock ordered map if unsafe is not set or if first argument is false
+	if len(unsafe) == 0 || !unsafe[0] {
+		m.Lock()
+		defer m.Unlock()
+	}
+
 	_, exists = m.m[key]
 	return
 }
 
 // Get gets records data from ordered map by key. Returns ok true if found.
-func (m *Omap[K, D]) Get(key K) (data D, ok bool) {
-	m.RLock()
-	defer m.RUnlock()
+func (m *Omap[K, D]) Get(key K, unsafe ...bool) (data D, ok bool) {
+
+	// Lock ordered map if unsafe is not set or if first argument is false
+	if len(unsafe) == 0 || !unsafe[0] {
+		m.Lock()
+		defer m.Unlock()
+	}
 
 	// Get list element
 	el, ok := m.m[key]
@@ -193,9 +203,13 @@ func (m *Omap[K, D]) Get(key K) (data D, ok bool) {
 }
 
 // GetRecord gets record from ordered map by key. Returns ok true if found.
-func (m *Omap[K, D]) GetRecord(key K) (rec *Record[K, D], ok bool) {
-	m.RLock()
-	defer m.RUnlock()
+func (m *Omap[K, D]) GetRecord(key K, unsafe ...bool) (rec *Record[K, D], ok bool) {
+
+	// Lock ordered map if unsafe is not set or if first argument is false
+	if len(unsafe) == 0 || !unsafe[0] {
+		m.Lock()
+		defer m.Unlock()
+	}
 
 	// Get record
 	rec, ok = m.m[key]
@@ -204,9 +218,13 @@ func (m *Omap[K, D]) GetRecord(key K) (rec *Record[K, D], ok bool) {
 
 // Del removes record from ordered map by key. Returns ok true and deleted data
 // if key exists, and record was successfully removed.
-func (m *Omap[K, D]) Del(key K) (data D, ok bool) {
-	m.Lock()
-	defer m.Unlock()
+func (m *Omap[K, D]) Del(key K, unsafe ...bool) (data D, ok bool) {
+
+	// Lock ordered map if unsafe is not set or if first argument is false
+	if len(unsafe) == 0 || !unsafe[0] {
+		m.Lock()
+		defer m.Unlock()
+	}
 
 	// Check if key exists and get data if exists
 	rec, ok := m.m[key]
@@ -228,9 +246,13 @@ func (m *Omap[K, D]) Del(key K) (data D, ok bool) {
 
 // DelLast removes last record from ordered map by default index. Returns ok
 // true and deleted record if it was successfully removed.
-func (m *Omap[K, D]) DelLast() (rec *Record[K, D], data D, ok bool) {
-	m.Lock()
-	defer m.Unlock()
+func (m *Omap[K, D]) DelLast(unsafe ...bool) (rec *Record[K, D], data D, ok bool) {
+
+	// Lock ordered map if unsafe is not set or if first argument is false
+	if len(unsafe) == 0 || !unsafe[0] {
+		m.Lock()
+		defer m.Unlock()
+	}
 
 	// Get index list by key
 	list, ok := m.Idx.getList()
@@ -351,7 +373,7 @@ func (m *Omap[K, D]) RecordsWrite(idxKey ...any) iter.Seq2[K, D] {
 
 // Refresh refreshes the index lists.
 //
-// The indexes automatically sorts when a new record is added or updated with
+// The indexes automatically sorts when a new record was added or updated with
 // the Set or SetFirst methods.
 //
 // If you directly update the map data (D type) use this method to refresh the
